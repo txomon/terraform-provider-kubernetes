@@ -2,10 +2,12 @@
 layout: "kubernetes"
 page_title: "Provider: Kubernetes"
 description: |-
-  The Kubernetes (K8s) provider is used to interact with the resources supported by Kubernetes. The provider needs to be configured with the proper credentials before it can be used.
+  This is a patched version of the official kubernetes provider with various fixes I couldn't get through in time. Details at https://github.com/txomon/terraform-provider-kubernetes#readme
 ---
 
-# Kubernetes Provider
+# (Patched) Kubernetes Provider
+
+This is a patched version of the official kubernetes provider with various fixes I couldn't get through in time. Details at https://github.com/txomon/terraform-provider-kubernetes#readme
 
 The Kubernetes (K8S) provider is used to interact with the resources supported by Kubernetes. The provider needs to be configured with the proper credentials before it can be used.
 

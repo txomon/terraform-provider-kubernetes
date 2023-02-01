@@ -10,3 +10,8 @@ All the patches can be found separately in branches:
 
 * `fix-replacement` Supresses forced replacement on attributes annotated with `x-kubernetes-preserve-unknown-fields`, https://github.com/hashicorp/terraform-provider-kubernetes/issues/1893
 * `fix-strict-lists` Fixes errors raised for incompatible Tuples `AttributeName("name"): can't use tftypes.Tuple[...] as tftypes.Tuple[...]` because of subitems having object attributes with no fields but annotated with `x-kubernetes-preserve-unknown-fields`, https://github.com/txomon/terraform-provider-kubernetes/issues/1
+
+
+Other branches:
+* `main` branch follows [upstream main](https://github.com/hashicorp/terraform-provider-kubernetes)
+* `master` has upstream merged with the different branches to enable parallel releases https://registry.terraform.io/providers/txomon/kubernetes
