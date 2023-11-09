@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package kubernetes
 
 import (
@@ -26,7 +29,7 @@ func dataSourceKubernetesNodes() *schema.Resource {
 					Schema: map[string]*schema.Schema{
 						"labels": {
 							Type:         schema.TypeMap,
-							Description:  "Select nodes with these labels. More info: http://kubernetes.io/docs/user-guide/labels",
+							Description:  "Select nodes with these labels. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/",
 							Required:     true,
 							Elem:         &schema.Schema{Type: schema.TypeString},
 							ValidateFunc: validateLabels,

@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package kubernetes
 
 import (
@@ -139,5 +142,5 @@ func dataSourceKubernetesIngressRead(ctx context.Context, d *schema.ResourceData
 	}
 	d.SetId(buildId(om))
 
-	return resourceKubernetesIngressRead(ctx, d, meta)
+	return resourceKubernetesIngressV1Beta1Read(ctx, d, meta)
 }

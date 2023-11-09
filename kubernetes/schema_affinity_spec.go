@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package kubernetes
 
 import (
@@ -118,6 +121,15 @@ func nodeSelectorRequirementsFields() map[string]*schema.Schema {
 						Set:         schema.HashString,
 					},
 				},
+			},
+		},
+		"match_fields": {
+			Type:        schema.TypeList,
+			Description: "A list of node selector requirements by node's fields. The requirements are ANDed.",
+			Optional:    true,
+			ForceNew:    true,
+			Elem: &schema.Resource{
+				Schema: nodeSelectorRequirementFields(),
 			},
 		},
 	}

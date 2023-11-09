@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package kubernetes
 
 import (
@@ -176,10 +179,12 @@ func getManagedLabels(managedFields []v1.ManagedFieldsEntry, manager string) (ma
 		if err != nil {
 			return nil, err
 		}
-		metadata := mm["f:metadata"].(map[string]interface{})
-		if l, ok := metadata["f:labels"].(map[string]interface{}); ok {
-			labels = l
+		if fm, ok := mm["f:metadata"].(map[string]interface{}); ok {
+			if l, ok := fm["f:labels"].(map[string]interface{}); ok {
+				labels = l
+			}
 		}
+
 	}
 	return labels, nil
 }
@@ -246,6 +251,7 @@ func resourceKubernetesLabelsUpdate(ctx context.Context, d *schema.ResourceData,
 		// with an empty labels map
 		labels = map[string]interface{}{}
 	}
+
 	patchmeta := map[string]interface{}{
 		"name":   name,
 		"labels": labels,

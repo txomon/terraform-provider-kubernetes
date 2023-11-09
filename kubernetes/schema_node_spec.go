@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package kubernetes
 
 import "github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -43,6 +46,23 @@ func nodeSpecFields() map[string]*schema.Schema {
 
 func nodeStatusFields() map[string]*schema.Schema {
 	return map[string]*schema.Schema{
+		"addresses": {
+			Type:        schema.TypeList,
+			Computed:    true,
+			Description: "Set of IP addresses and/or Hostname assigned to the node. More info: https://kubernetes.io/docs/concepts/architecture/nodes/#addresses/node/#info",
+			Elem: &schema.Resource{
+				Schema: map[string]*schema.Schema{
+					"type": {
+						Type:     schema.TypeString,
+						Computed: true,
+					},
+					"address": {
+						Type:     schema.TypeString,
+						Computed: true,
+					},
+				},
+			},
+		},
 		"allocatable": {
 			Type:        schema.TypeMap,
 			Description: "Represents the total resources of a node.",
@@ -113,7 +133,6 @@ func nodeTaintFields() map[string]*schema.Schema {
 			Type:        schema.TypeString,
 			Description: "The taint key",
 			Required:    true,
-			ForceNew:    true,
 		},
 		"value": {
 			Type:        schema.TypeString,
@@ -124,7 +143,6 @@ func nodeTaintFields() map[string]*schema.Schema {
 			Type:        schema.TypeString,
 			Description: "The taint effect",
 			Required:    true,
-			ForceNew:    true,
 		},
 	}
 }

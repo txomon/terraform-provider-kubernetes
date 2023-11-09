@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package kubernetes
 
 import (
@@ -38,7 +41,7 @@ func podSpecFields(isUpdatable, isComputed bool) map[string]*schema.Schema {
 			Type:        schema.TypeList,
 			Optional:    true,
 			ForceNew:    false, // always updatable
-			Description: "List of containers belonging to the pod. Containers cannot currently be added or removed. There must be at least one container in a Pod. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/containers",
+			Description: "List of containers belonging to the pod. Containers cannot currently be added or removed. There must be at least one container in a Pod. Cannot be updated. More info: https://kubernetes.io/docs/concepts/containers/",
 			Elem: &schema.Resource{
 				Schema: containerFields(isUpdatable),
 			},
@@ -74,7 +77,7 @@ func podSpecFields(isUpdatable, isComputed bool) map[string]*schema.Schema {
 			Computed:    isComputed,
 			ForceNew:    !isUpdatable,
 			Default:     conditionalDefault(!isComputed, string(api.DNSClusterFirst)),
-			Description: "Set DNS policy for containers within the pod. Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst', 'Default' or 'None'. DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy. To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to 'ClusterFirstWithHostNet'. Optional: Defaults to 'ClusterFirst', see [Kubernetes reference](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy).",
+			Description: "Set DNS policy for containers within the pod. Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst', 'Default' or 'None'. DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy. To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to 'ClusterFirstWithHostNet'. Defaults to 'ClusterFirst'. More info: https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy",
 			ValidateFunc: validation.StringInSlice([]string{
 				string(api.DNSClusterFirst),
 				string(api.DNSClusterFirstWithHostNet),
@@ -198,16 +201,32 @@ func podSpecFields(isUpdatable, isComputed bool) map[string]*schema.Schema {
 			ForceNew:    !isUpdatable,
 			Description: "Specifies the hostname of the Pod If not specified, the pod's hostname will be set to a system-defined value.",
 		},
+		"os": {
+			Type:        schema.TypeList,
+			Optional:    true,
+			MaxItems:    1,
+			Description: "Specifies the OS of the containers in the pod.",
+			Elem: &schema.Resource{
+				Schema: map[string]*schema.Schema{
+					"name": {
+						Type:         schema.TypeString,
+						Required:     true,
+						ValidateFunc: validation.StringInSlice([]string{string(api.Linux), string(api.Windows)}, false),
+						Description:  "Name is the name of the operating system. The currently supported values are linux and windows.",
+					},
+				},
+			},
+		},
 		"image_pull_secrets": {
 			Type:        schema.TypeList,
-			Description: "ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec. If specified, these secrets will be passed to individual puller implementations for them to use. For example, in the case of docker, only DockerConfig type secrets are honored. More info: http://kubernetes.io/docs/user-guide/images#specifying-imagepullsecrets-on-a-pod",
+			Description: "ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec. If specified, these secrets will be passed to individual puller implementations for them to use. For example, in the case of docker, only DockerConfig type secrets are honored. More info: https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod",
 			Optional:    true,
 			Computed:    true,
 			Elem: &schema.Resource{
 				Schema: map[string]*schema.Schema{
 					"name": {
 						Type:        schema.TypeString,
-						Description: "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+						Description: "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
 						Required:    true,
 						ForceNew:    !isUpdatable,
 					},
@@ -226,7 +245,7 @@ func podSpecFields(isUpdatable, isComputed bool) map[string]*schema.Schema {
 			Optional:    true,
 			Computed:    isComputed,
 			ForceNew:    !isUpdatable,
-			Description: "NodeSelector is a selector which must be true for the pod to fit on a node. Selector which must match a node's labels for the pod to be scheduled on that node. More info: http://kubernetes.io/docs/user-guide/node-selection.",
+			Description: "NodeSelector is a selector which must be true for the pod to fit on a node. Selector which must match a node's labels for the pod to be scheduled on that node. More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/.",
 		},
 		"runtime_class_name": {
 			Type:        schema.TypeString,
@@ -248,7 +267,7 @@ func podSpecFields(isUpdatable, isComputed bool) map[string]*schema.Schema {
 			Computed:    isComputed,
 			ForceNew:    !isUpdatable,
 			Default:     conditionalDefault(!isComputed, string(api.RestartPolicyAlways)),
-			Description: "Restart policy for all containers within the pod. One of Always, OnFailure, Never. More info: http://kubernetes.io/docs/user-guide/pod-states#restartpolicy.",
+			Description: "Restart policy for all containers within the pod. One of Always, OnFailure, Never. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy.",
 			ValidateFunc: validation.StringInSlice([]string{
 				string(api.RestartPolicyAlways),
 				string(api.RestartPolicyOnFailure),
@@ -327,6 +346,37 @@ func podSpecFields(isUpdatable, isComputed bool) map[string]*schema.Schema {
 							Type: schema.TypeInt,
 						},
 					},
+					"windows_options": {
+						Type:        schema.TypeList,
+						MaxItems:    1,
+						Description: "The Windows specific settings applied to all containers. If unspecified, the options within a container's SecurityContext will be used. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is linux.",
+						Optional:    true,
+						Elem: &schema.Resource{
+							Schema: map[string]*schema.Schema{
+								"gmsa_credential_spec": {
+									Type:        schema.TypeString,
+									Description: "GMSACredentialSpec is where the GMSA admission webhook inlines the contents of the GMSA credential spec named by the GMSACredentialSpecName field",
+									Optional:    true,
+								},
+								"gmsa_credential_spec_name": {
+									Type:        schema.TypeString,
+									Description: "GMSACredentialSpecName is the name of the GMSA credential spec to use.",
+									Optional:    true,
+								},
+								"host_process": {
+									Type:        schema.TypeBool,
+									Description: "HostProcess determines if a container should be run as a 'Host Process' container. Default value is false.",
+									Default:     false,
+									Optional:    true,
+								},
+								"run_as_username": {
+									Type:        schema.TypeString,
+									Description: "The UserName in Windows to run the entrypoint of the container process. Defaults to the user specified in image metadata if unspecified. May also be set in PodSecurityContext. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.",
+									Optional:    true,
+								},
+							},
+						},
+					},
 					"sysctl": {
 						Type:        schema.TypeList,
 						Optional:    true,
@@ -350,6 +400,13 @@ func podSpecFields(isUpdatable, isComputed bool) map[string]*schema.Schema {
 					},
 				},
 			},
+		},
+		"scheduler_name": {
+			Type:        schema.TypeString,
+			Optional:    true,
+			Computed:    true,
+			ForceNew:    !isUpdatable,
+			Description: "If specified, the pod will be dispatched by specified scheduler. If not specified, the pod will be dispatched by default scheduler.",
 		},
 		"service_account_name": {
 			Type:        schema.TypeString,
@@ -474,8 +531,7 @@ func podSpecFields(isUpdatable, isComputed bool) map[string]*schema.Schema {
 		"volume": {
 			Type:        schema.TypeList,
 			Optional:    true,
-			Computed:    true,
-			Description: "List of volumes that can be mounted by containers belonging to the pod. More info: http://kubernetes.io/docs/user-guide/volumes",
+			Description: "List of volumes that can be mounted by containers belonging to the pod. More info: https://kubernetes.io/docs/concepts/storage/volumes",
 			Elem:        volumeSchema(isUpdatable),
 		},
 	}
@@ -532,7 +588,7 @@ func volumeSchema(isUpdatable bool) *schema.Resource {
 				},
 				"name": {
 					Type:        schema.TypeString,
-					Description: "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+					Description: "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
 					Optional:    true,
 				},
 			},
@@ -653,14 +709,14 @@ func volumeSchema(isUpdatable bool) *schema.Resource {
 
 	v["empty_dir"] = &schema.Schema{
 		Type:        schema.TypeList,
-		Description: "EmptyDir represents a temporary directory that shares a pod's lifetime. More info: http://kubernetes.io/docs/user-guide/volumes#emptydir",
+		Description: "EmptyDir represents a temporary directory that shares a pod's lifetime. More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir",
 		Optional:    true,
 		MaxItems:    1,
 		Elem: &schema.Resource{
 			Schema: map[string]*schema.Schema{
 				"medium": {
 					Type:         schema.TypeString,
-					Description:  `What type of storage medium should back this directory. The default is "" which means to use the node's default medium. Must be an empty string (default) or Memory. More info: http://kubernetes.io/docs/user-guide/volumes#emptydir`,
+					Description:  `What type of storage medium should back this directory. The default is "" which means to use the node's default medium. Must be an empty string (default) or Memory. More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir`,
 					Optional:     true,
 					Default:      "",
 					ForceNew:     !isUpdatable,
@@ -673,6 +729,60 @@ func volumeSchema(isUpdatable bool) *schema.Resource {
 					ForceNew:         !isUpdatable,
 					ValidateFunc:     validateResourceQuantity,
 					DiffSuppressFunc: suppressEquivalentResourceQuantity,
+				},
+			},
+		},
+	}
+
+	v["ephemeral"] = &schema.Schema{
+		Type:        schema.TypeList,
+		Description: "Represents an ephemeral volume that is handled by a normal storage driver. More info: https://kubernetes.io/docs/concepts/storage/ephemeral-volumes/#generic-ephemeral-volumes",
+		Optional:    true,
+		MaxItems:    1,
+		Elem: &schema.Resource{
+			Schema: map[string]*schema.Schema{
+				"volume_claim_template": {
+					Type:        schema.TypeList,
+					Description: "Will be used to create a stand-alone PVC to provision the volume. The pod in which this EphemeralVolumeSource is embedded will be the owner of the PVC.",
+					Required:    true,
+					MaxItems:    1,
+					Elem: &schema.Resource{
+						Schema: map[string]*schema.Schema{
+							"metadata": {
+								Type:        schema.TypeList,
+								Description: "May contain labels and annotations that will be copied into the PVC when creating it. No other fields are allowed and will be rejected during validation.",
+								Optional:    true,
+								MaxItems:    1,
+								Elem: &schema.Resource{
+									Schema: map[string]*schema.Schema{
+										"annotations": {
+											Type:         schema.TypeMap,
+											Description:  "An unstructured key value map stored with the persistent volume claim that may be used to store arbitrary metadata. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/",
+											Optional:     true,
+											Elem:         &schema.Schema{Type: schema.TypeString},
+											ValidateFunc: validateAnnotations,
+										},
+										"labels": {
+											Type:         schema.TypeMap,
+											Description:  "Map of string keys and values that can be used to organize and categorize (scope and select) the persistent volume claim. May match selectors of replication controllers and services. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/",
+											Optional:     true,
+											Elem:         &schema.Schema{Type: schema.TypeString},
+											ValidateFunc: validateLabels,
+										},
+									},
+								},
+							},
+							"spec": {
+								Type:        schema.TypeList,
+								Description: "The specification for the PersistentVolumeClaim. The entire content is copied unchanged into the PVC that gets created from this template. The same fields as in a PersistentVolumeClaim are also valid here.",
+								Required:    true,
+								MaxItems:    1,
+								Elem: &schema.Resource{
+									Schema: persistentVolumeClaimSpecFields(),
+								},
+							},
+						},
+					},
 				},
 			},
 		},
@@ -702,7 +812,7 @@ func volumeSchema(isUpdatable bool) *schema.Resource {
 
 	v["secret"] = &schema.Schema{
 		Type:        schema.TypeList,
-		Description: "Secret represents a secret that should populate this volume. More info: http://kubernetes.io/docs/user-guide/volumes#secrets",
+		Description: "Secret represents a secret that should populate this volume. More info: https://kubernetes.io/docs/concepts/storage/volumes#secrets",
 		Optional:    true,
 		MaxItems:    1,
 		Elem: &schema.Resource{
@@ -747,7 +857,7 @@ func volumeSchema(isUpdatable bool) *schema.Resource {
 				},
 				"secret_name": {
 					Type:        schema.TypeString,
-					Description: "Name of the secret in the pod's namespace to use. More info: http://kubernetes.io/docs/user-guide/volumes#secrets",
+					Description: "Name of the secret in the pod's namespace to use. More info: https://kubernetes.io/docs/concepts/storage/volumes#secrets",
 					Optional:    true,
 				},
 			},
@@ -755,7 +865,7 @@ func volumeSchema(isUpdatable bool) *schema.Resource {
 	}
 	v["name"] = &schema.Schema{
 		Type:        schema.TypeString,
-		Description: "Volume's name. Must be a DNS_LABEL and unique within the pod. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+		Description: "Volume's name. Must be a DNS_LABEL and unique within the pod. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
 		Optional:    true,
 	}
 
@@ -780,15 +890,15 @@ func volumeSchema(isUpdatable bool) *schema.Resource {
 					Elem: &schema.Resource{
 						Schema: map[string]*schema.Schema{
 							// identical to SecretVolumeSource but without the default mode and uses a local object reference as name instead of a secret name.
-							"secret": &schema.Schema{
+							"secret": {
 								Type:        schema.TypeList,
-								Description: "Secret represents a secret that should populate this volume. More info: http://kubernetes.io/docs/user-guide/volumes#secrets",
+								Description: "Secret represents a secret that should populate this volume. More info: https://kubernetes.io/docs/concepts/storage/volumes#secrets",
 								Optional:    true,
 								Elem: &schema.Resource{
 									Schema: map[string]*schema.Schema{
 										"name": {
 											Type:        schema.TypeString,
-											Description: "Name of the secret in the pod's namespace to use. More info: http://kubernetes.io/docs/user-guide/volumes#secrets",
+											Description: "Name of the secret in the pod's namespace to use. More info: https://kubernetes.io/docs/concepts/storage/volumes#secrets",
 											Optional:    true,
 										},
 										"items": {
@@ -826,7 +936,7 @@ func volumeSchema(isUpdatable bool) *schema.Resource {
 								},
 							},
 							// identical to ConfigMapVolumeSource but without the default mode and uses a local object reference as name instead of a secret name.
-							"config_map": &schema.Schema{
+							"config_map": {
 								Type:        schema.TypeList,
 								Description: "ConfigMap represents a configMap that should populate this volume",
 								Optional:    true,
@@ -834,7 +944,7 @@ func volumeSchema(isUpdatable bool) *schema.Resource {
 									Schema: map[string]*schema.Schema{
 										"name": {
 											Type:        schema.TypeString,
-											Description: "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+											Description: "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
 											Optional:    true,
 										},
 										"items": {
@@ -872,7 +982,7 @@ func volumeSchema(isUpdatable bool) *schema.Resource {
 								},
 							},
 							// identical to DownwardAPIVolumeSource but without the default mode.
-							"downward_api": &schema.Schema{
+							"downward_api": {
 								Type:        schema.TypeList,
 								Description: "DownwardAPI represents downward API about the pod that should populate this volume",
 								Optional:    true,
@@ -950,7 +1060,7 @@ func volumeSchema(isUpdatable bool) *schema.Resource {
 									},
 								},
 							},
-							"service_account_token": &schema.Schema{
+							"service_account_token": {
 								Type:        schema.TypeList,
 								Description: "A projected service account token volume",
 								Optional:    true,
@@ -985,7 +1095,7 @@ func volumeSchema(isUpdatable bool) *schema.Resource {
 	}
 	v["csi"] = &schema.Schema{
 		Type:        schema.TypeList,
-		Description: "Represents a CSI Volume. More info: http://kubernetes.io/docs/user-guide/volumes#csi",
+		Description: "Represents a CSI Volume. More info: https://kubernetes.io/docs/concepts/storage/volumes#csi",
 		Optional:    true,
 		MaxItems:    1,
 		Elem: &schema.Resource{
@@ -1007,7 +1117,7 @@ func volumeSchema(isUpdatable bool) *schema.Resource {
 				},
 				"read_only": {
 					Type:        schema.TypeBool,
-					Description: "Whether to set the read-only property in VolumeMounts to \"true\". If omitted, the default is \"false\". More info: http://kubernetes.io/docs/user-guide/volumes#csi",
+					Description: "Whether to set the read-only property in VolumeMounts to \"true\". If omitted, the default is \"false\". More info: https://kubernetes.io/docs/concepts/storage/volumes#csi",
 					Optional:    true,
 				},
 				"node_publish_secret_ref": {
@@ -1019,7 +1129,7 @@ func volumeSchema(isUpdatable bool) *schema.Resource {
 						Schema: map[string]*schema.Schema{
 							"name": {
 								Type:        schema.TypeString,
-								Description: "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+								Description: "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
 								Optional:    true,
 							},
 						},

@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package kubernetes
 
 import (
@@ -7,7 +10,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 )
 
-func flattenJobSpec(in batchv1.JobSpec, d *schema.ResourceData, meta interface{}, prefix ...string) ([]interface{}, error) {
+func flattenJobV1Spec(in batchv1.JobSpec, d *schema.ResourceData, meta interface{}, prefix ...string) ([]interface{}, error) {
 	att := make(map[string]interface{})
 
 	if in.ActiveDeadlineSeconds != nil {
@@ -61,7 +64,7 @@ func flattenJobSpec(in batchv1.JobSpec, d *schema.ResourceData, meta interface{}
 	return []interface{}{att}, nil
 }
 
-func expandJobSpec(j []interface{}) (batchv1.JobSpec, error) {
+func expandJobV1Spec(j []interface{}) (batchv1.JobSpec, error) {
 	obj := batchv1.JobSpec{}
 
 	if len(j) == 0 || j[0] == nil {
@@ -74,7 +77,7 @@ func expandJobSpec(j []interface{}) (batchv1.JobSpec, error) {
 		obj.ActiveDeadlineSeconds = ptrToInt64(int64(v))
 	}
 
-	if v, ok := in["backoff_limit"].(int); ok && v != 6 {
+	if v, ok := in["backoff_limit"].(int); ok && v >= 0 {
 		obj.BackoffLimit = ptrToInt32(int32(v))
 	}
 
@@ -116,7 +119,7 @@ func expandJobSpec(j []interface{}) (batchv1.JobSpec, error) {
 	return obj, nil
 }
 
-func patchJobSpec(pathPrefix, prefix string, d *schema.ResourceData) (PatchOperations, error) {
+func patchJobV1Spec(pathPrefix, prefix string, d *schema.ResourceData) (PatchOperations, error) {
 	ops := make([]PatchOperation, 0)
 
 	if d.HasChange(prefix + "active_deadline_seconds") {

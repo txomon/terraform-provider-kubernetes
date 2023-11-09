@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package kubernetes
 
 import (
@@ -1228,6 +1231,38 @@ func expandVsphereVirtualDiskVolumeSource(l []interface{}) *v1.VsphereVirtualDis
 		obj.FSType = v
 	}
 	return obj
+}
+
+func expandEphemeralVolumeClaimTemplate(l []interface{}) (*v1.PersistentVolumeClaimTemplate, error) {
+	if len(l) == 0 || l[0] == nil {
+		return &v1.PersistentVolumeClaimTemplate{}, nil
+	}
+	in := l[0].(map[string]interface{})
+	pv, err := expandPersistentVolumeClaimSpec(in["spec"].([]interface{}))
+	if err != nil {
+		return &v1.PersistentVolumeClaimTemplate{}, err
+	}
+
+	return &v1.PersistentVolumeClaimTemplate{
+		ObjectMeta: expandMetadata(in["metadata"].([]interface{})),
+		Spec:       *pv,
+	}, nil
+}
+
+func expandEphemeralVolumeSource(l []interface{}) (*v1.EphemeralVolumeSource, error) {
+	if len(l) == 0 || l[0] == nil {
+		return &v1.EphemeralVolumeSource{}, nil
+	}
+	in := l[0].(map[string]interface{})
+
+	t, err := expandEphemeralVolumeClaimTemplate(in["volume_claim_template"].([]interface{}))
+	if err != nil {
+		return &v1.EphemeralVolumeSource{}, err
+	}
+
+	return &v1.EphemeralVolumeSource{
+		VolumeClaimTemplate: t,
+	}, nil
 }
 
 func patchPersistentVolumeSpec(pathPrefix, prefix string, d *schema.ResourceData) (PatchOperations, error) {

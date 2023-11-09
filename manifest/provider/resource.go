@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package provider
 
 import (
@@ -31,7 +34,7 @@ func GVRFromUnstructured(o *unstructured.Unstructured, m meta.RESTMapper) (schem
 }
 
 // GVKFromTftypesObject extracts a canonical schema.GroupVersionKind out of the resource's
-// metadata by checking it agaings the discovery API via a RESTMapper
+// metadata by checking it against the discovery API via a RESTMapper
 func GVKFromTftypesObject(in *tftypes.Value, m meta.RESTMapper) (schema.GroupVersionKind, error) {
 	var obj map[string]tftypes.Value
 	err := in.As(&obj)

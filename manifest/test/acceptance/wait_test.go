@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 //go:build acceptance
 // +build acceptance
 
@@ -5,6 +8,7 @@ package acceptance
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -184,4 +188,95 @@ func TestKubernetesManifest_WaitCondition_Pod(t *testing.T) {
 		"kubernetes_manifest.test.wait.0.condition.1.type":   "ContainersReady",
 		"kubernetes_manifest.test.wait.0.condition.1.status": "True",
 	})
+}
+
+func TestKubernetesManifest_Wait_InvalidCondition(t *testing.T) {
+	// NOTE: this tests that specifying a condition for a resource that
+	// will never have one does not crash the provider
+
+	ctx := context.Background()
+
+	name := randName()
+
+	reattachInfo, err := provider.ServeTest(ctx, hclog.Default(), t)
+	if err != nil {
+		t.Errorf("Failed to create provider instance: %q", err)
+	}
+
+	tf := tfhelper.RequireNewWorkingDir(ctx, t)
+	tf.SetReattachInfo(ctx, reattachInfo)
+	defer func() {
+		tf.Destroy(ctx)
+		tf.Close()
+		k8shelper.AssertResourceDoesNotExist(t, "v1", "namespaces", name)
+	}()
+
+	tfvars := TFVARS{
+		"name": name,
+	}
+	tfconfig := loadTerraformConfig(t, "Wait/wait_for_condition_invalid.tf", tfvars)
+	tf.SetConfig(ctx, tfconfig)
+	tf.Init(ctx)
+
+	err = tf.Apply(ctx)
+	if err == nil || !strings.Contains(err.Error(), "timed out waiting on") {
+		t.Fatalf("Waiter should have timed out")
+	}
+
+	st, err := tf.State(ctx)
+	if err != nil {
+		t.Fatalf("Failed to get state: %q", err)
+	}
+	tfstate := tfstatehelper.NewHelper(st)
+	if !tfstate.ResourceExists(t, "kubernetes_manifest.test") {
+		t.Fatalf("Expected resource to exist in state")
+	}
+}
+
+func TestKubernetesManifest_WaitFields_Annotations(t *testing.T) {
+	ctx := context.Background()
+
+	name := randName()
+	namespace := randName()
+
+	reattachInfo, err := provider.ServeTest(ctx, hclog.Default(), t)
+	if err != nil {
+		t.Errorf("Failed to create provider instance: %q", err)
+	}
+
+	tf := tfhelper.RequireNewWorkingDir(ctx, t)
+	tf.SetReattachInfo(ctx, reattachInfo)
+	defer func() {
+		tf.Destroy(ctx)
+		tf.Close()
+		k8shelper.AssertNamespacedResourceDoesNotExist(t, "v1", "secrets", namespace, name)
+	}()
+
+	k8shelper.CreateNamespace(t, namespace)
+	defer k8shelper.DeleteResource(t, namespace, kubernetes.NewGroupVersionResource("v1", "namespaces"))
+
+	tfvars := TFVARS{
+		"namespace": namespace,
+		"name":      name,
+	}
+	tfconfig := loadTerraformConfig(t, "Wait/wait_for_fields_annotations.tf", tfvars)
+	tf.SetConfig(ctx, tfconfig)
+	tf.Init(ctx)
+
+	tf.Apply(ctx)
+
+	k8shelper.AssertNamespacedResourceExists(t, "v1", "secrets", namespace, name)
+
+	st, err := tf.State(ctx)
+	if err != nil {
+		t.Fatalf("Failed to obtain state: %q", err)
+	}
+	tfstate := tfstatehelper.NewHelper(st)
+	tfstate.AssertAttributeValues(t, tfstatehelper.AttributeValues{
+		"kubernetes_manifest.test.wait.0.fields": map[string]interface{}{
+			"metadata.annotations[\"kubernetes.io/service-account.uid\"]": "^.*$",
+		},
+	})
+
+	tfstate.AssertOutputExists(t, "test")
 }

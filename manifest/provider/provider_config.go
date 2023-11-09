@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package provider
 
 import (
@@ -47,6 +50,17 @@ func GetProviderConfigSchema() *tfprotov5.Schema {
 				Name:            "insecure",
 				Type:            tftypes.Bool,
 				Description:     "Whether server should be accessed without verifying the TLS certificate.",
+				Required:        false,
+				Optional:        true,
+				Computed:        false,
+				Sensitive:       false,
+				DescriptionKind: 0,
+				Deprecated:      false,
+			},
+			{
+				Name:            "tls_server_name",
+				Type:            tftypes.String,
+				Description:     "Server name passed to the server for SNI and is used in the client to check server certificates against.",
 				Required:        false,
 				Optional:        true,
 				Computed:        false,

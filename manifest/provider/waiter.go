@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package provider
 
 import (
@@ -37,6 +40,14 @@ func (s *RawProviderServer) waitForCompletion(ctx context.Context, waitForBlock 
 // Waiter is a simple interface to implement a blocking wait operation
 type Waiter interface {
 	Wait(context.Context) error
+}
+
+type WaiterError struct {
+	Reason string
+}
+
+func (e WaiterError) Error() string {
+	return fmt.Sprintf("timed out waiting on %v", e.Reason)
 }
 
 // NewResourceWaiter constructs an appropriate Waiter using the supplied waitForBlock configuration
@@ -142,7 +153,7 @@ func (w *FieldWaiter) Wait(ctx context.Context) error {
 	for {
 		if deadline, ok := ctx.Deadline(); ok {
 			if time.Now().After(deadline) {
-				return context.DeadlineExceeded
+				return WaiterError{Reason: "field matchers"}
 			}
 		}
 
@@ -280,7 +291,7 @@ func (w *RolloutWaiter) Wait(ctx context.Context) error {
 	for {
 		if deadline, ok := ctx.Deadline(); ok {
 			if time.Now().After(deadline) {
-				return context.DeadlineExceeded
+				return WaiterError{Reason: "rollout to complete"}
 			}
 		}
 
@@ -330,7 +341,7 @@ func (w *ConditionsWaiter) Wait(ctx context.Context) error {
 	for {
 		if deadline, ok := ctx.Deadline(); ok {
 			if time.Now().After(deadline) {
-				return context.DeadlineExceeded
+				return WaiterError{Reason: "conditions"}
 			}
 		}
 
@@ -343,7 +354,7 @@ func (w *ConditionsWaiter) Wait(ctx context.Context) error {
 		}
 
 		if status, ok := res.Object["status"].(map[string]interface{}); ok {
-			if conditions := status["conditions"].([]interface{}); ok && len(conditions) > 0 {
+			if conditions, ok := status["conditions"].([]interface{}); ok && len(conditions) > 0 {
 				conditionsMet := true
 				for _, c := range w.conditions {
 					var condition map[string]tftypes.Value

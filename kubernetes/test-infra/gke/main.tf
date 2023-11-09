@@ -1,25 +1,12 @@
-variable "kubernetes_version" {
-  default = ""
-}
-
-variable "workers_count" {
-  default = "2"
-}
-
-variable "node_machine_type" {
-  default = "e2-standard-2"
-}
-
-variable "enable_alpha" {
-  default = false
-}
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
 
 data "google_compute_zones" "available" {
 }
 
 data "google_container_engine_versions" "supported" {
   location       = data.google_compute_zones.available.names[0]
-  version_prefix = var.kubernetes_version
+  version_prefix = var.cluster_version
 }
 
 resource "random_id" "cluster_name" {
@@ -33,7 +20,7 @@ resource "google_service_account" "default" {
 
 resource "google_container_cluster" "primary" {
   provider           = google-beta
-  name               = "tf-acc-test-${random_id.cluster_name.hex}"
+  name               = var.cluster_name != "" ? var.cluster_name : "tf-acc-test-${random_id.cluster_name.hex}"
   location           = data.google_compute_zones.available.names[0]
   node_version       = data.google_container_engine_versions.supported.latest_node_version
   min_master_version = data.google_container_engine_versions.supported.latest_master_version
@@ -52,13 +39,13 @@ resource "google_container_cluster" "primary" {
   ]
 
   node_pool {
-    initial_node_count = var.workers_count
+    initial_node_count = var.node_count
     management {
       auto_repair  = var.enable_alpha ? false : true
       auto_upgrade = var.enable_alpha ? false : true
     }
     node_config {
-      machine_type    = var.node_machine_type
+      machine_type    = var.instance_type
       service_account = google_service_account.default.email
       oauth_scopes = [
         "https://www.googleapis.com/auth/cloud-platform",
@@ -69,6 +56,8 @@ resource "google_container_cluster" "primary" {
       ]
     }
   }
+
+  deletion_protection = false
 }
 
 locals {
@@ -117,20 +106,4 @@ locals {
 resource "local_file" "kubeconfig" {
   content  = yamlencode(local.kubeconfig)
   filename = "${path.module}/kubeconfig"
-}
-
-output "google_zone" {
-  value = data.google_compute_zones.available.names[0]
-}
-
-output "node_version" {
-  value = google_container_cluster.primary.node_version
-}
-
-output "kubeconfig_path" {
-  value = local_file.kubeconfig.filename
-}
-
-output "cluster_name" {
-  value = google_container_cluster.primary.name
 }

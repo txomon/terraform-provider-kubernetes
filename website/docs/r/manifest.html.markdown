@@ -101,7 +101,7 @@ terraform import kubernetes_manifest.secret_sample "apiVersion=v1,kind=Secret,na
 ```
 
 Note the import ID as the last argument to the import command. This ID points Terraform at which Kubernetes object to read when importing.
-It should be constructed with the following syntax: `"apiVersion=<string>,kind=<string>,[namespace=<string>,]name=<string>"`
+It should be constructed with the following syntax: `"apiVersion=<string>,kind=<string>,[namespace=<string>,]name=<string>"`. The `namespace=<string>` in the ID string is required only for Kubernetes namespaced objects and should be omitted for cluster-wide objects.
 
 ## Using `wait` to block create and update calls
 
@@ -194,7 +194,7 @@ resource "kubernetes_manifest" "test" {
 
 ## Computed fields
 
-When setting the value of an field in configuration, Terraform will check that the same value is returned after the apply operation. This ensures that the actual configuration requested by the user is successfully applied. In some cases, with the Kubernetes API this is not the desired behavior. Particularly when using mutating admission controllers, there is a chance that the values configured by the user will be modified by the API. 
+When setting the value of an field in configuration, Terraform will check that the same value is returned after the apply operation. This ensures that the actual configuration requested by the user is successfully applied. In some cases, with the Kubernetes API this is not the desired behavior. Particularly when using mutating admission controllers, there is a chance that the values configured by the user will be modified by the API. This usually manifest as `Error: Provider produced inconsistent result after apply` and `produced an unexpected new value:` messages when applying.
 
 To accommodate this, the `kubernetes_manifest` resources allows defining so-called "computed" fields. When an field is defined as "computed" Terraform will allow the final value stored in state after `apply` as returned by the API to be different than what the user requested. 
 

@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package kubernetes
 
 import (
@@ -17,7 +20,7 @@ func TestAccKubernetesIgnoreKubernetesMetadata_basic(t *testing.T) {
 	ignoreKubernetesMetadata := "terraform.io/provider"
 	dataSourceName := "data.kubernetes_namespace_v1.this"
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck: func() {
 			testAccPreCheck(t)
 			createNamespaceIgnoreKubernetesMetadata(namespaceName, ignoreKubernetesMetadata)

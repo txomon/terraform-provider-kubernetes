@@ -54,6 +54,8 @@ For specific usage examples, see the guides for [AKS](https://github.com/hashico
 
 ## Authentication
 
+~> NOTE: The provider does not use the `KUBECONFIG` environment variable by default. See the attribute reference below for the environment variables that map to provider block attributes.
+
 The Kubernetes provider can get its configuration in two ways:
 
 1. _Explicitly_ by supplying attributes to the provider block. This includes:
@@ -111,6 +113,8 @@ provider "kubernetes" {
 The provider uses the `KUBERNETES_SERVICE_HOST` and `KUBERNETES_SERVICE_PORT` environment variables to detect when it is running inside a cluster, so in this case you do not need to specify any attributes in the provider block if you want to connect to the local kubernetes cluster.
 
 If you want to connect to a different cluster than the one terraform is running inside, configure the provider as [above](#credentials-config).
+
+Find more comprehensive `in-cluster` config example [here](https://github.com/hashicorp/terraform-provider-kubernetes/tree/main/_examples/in-cluster).
 
 ## Exec plugins
 
@@ -171,6 +175,7 @@ The following arguments are supported:
 * `username` - (Optional) The username to use for HTTP basic authentication when accessing the Kubernetes API. Can be sourced from `KUBE_USER`.
 * `password` - (Optional) The password to use for HTTP basic authentication when accessing the Kubernetes API. Can be sourced from `KUBE_PASSWORD`.
 * `insecure` - (Optional) Whether the server should be accessed without verifying the TLS certificate. Can be sourced from `KUBE_INSECURE`. Defaults to `false`.
+* `tls_server_name` - (Optional) Server name passed to the server for SNI and is used in the client to check server certificates against. Can be sourced from `KUBE_TLS_SERVER_NAME`.
 * `client_certificate` - (Optional) PEM-encoded client certificate for TLS authentication. Can be sourced from `KUBE_CLIENT_CERT_DATA`.
 * `client_key` - (Optional) PEM-encoded client certificate key for TLS authentication. Can be sourced from `KUBE_CLIENT_KEY_DATA`.
 * `cluster_ca_certificate` - (Optional) PEM-encoded root certificates bundle for TLS authentication. Can be sourced from `KUBE_CLUSTER_CA_CERT_DATA`.

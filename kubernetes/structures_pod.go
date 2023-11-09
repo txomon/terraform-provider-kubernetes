@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package kubernetes
 
 import (
@@ -10,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/#taint-based-evictions
@@ -24,6 +28,14 @@ var builtInTolerations = map[string]string{
 }
 
 // Flatteners
+
+func flattenOS(in v1.PodOS) []interface{} {
+	att := make(map[string]interface{})
+	if in.Name != "" {
+		att["name"] = in.Name
+	}
+	return []interface{}{att}
+}
 
 func flattenPodSpec(in v1.PodSpec) ([]interface{}, error) {
 	att := make(map[string]interface{})
@@ -88,6 +100,10 @@ func flattenPodSpec(in v1.PodSpec) ([]interface{}, error) {
 	}
 	att["image_pull_secrets"] = flattenLocalObjectReferenceArray(in.ImagePullSecrets)
 
+	if in.OS != nil {
+		att["os"] = flattenOS(*in.OS)
+	}
+
 	if in.NodeName != "" {
 		att["node_name"] = in.NodeName
 	}
@@ -106,6 +122,10 @@ func flattenPodSpec(in v1.PodSpec) ([]interface{}, error) {
 
 	if in.SecurityContext != nil {
 		att["security_context"] = flattenPodSecurityContext(in.SecurityContext)
+	}
+
+	if in.SchedulerName != "" {
+		att["scheduler_name"] = in.SchedulerName
 	}
 
 	if in.ServiceAccountName != "" {
@@ -228,6 +248,10 @@ func flattenPodSecurityContext(in *v1.PodSecurityContext) []interface{} {
 	}
 	if in.Sysctls != nil {
 		att["sysctl"] = flattenSysctls(in.Sysctls)
+	}
+
+	if in.WindowsOptions != nil {
+		att["windows_options"] = flattenWindowsOptions(*in.WindowsOptions)
 	}
 
 	if len(att) > 0 {
@@ -414,6 +438,9 @@ func flattenVolumes(volumes []v1.Volume) ([]interface{}, error) {
 		}
 		if v.PhotonPersistentDisk != nil {
 			obj["photon_persistent_disk"] = flattenPhotonPersistentDiskVolumeSource(v.PhotonPersistentDisk)
+		}
+		if v.Ephemeral != nil {
+			obj["ephemeral"] = flattenPodEphemeralVolumeSource(v.Ephemeral)
 		}
 		att[i] = obj
 	}
@@ -649,7 +676,51 @@ func flattenReadinessGates(in []v1.PodReadinessGate) ([]interface{}, error) {
 	return att, nil
 }
 
+func flattenPersistentVolumeClaimMetadata(in metav1.ObjectMeta) map[string]interface{} {
+	att := make(map[string]interface{})
+
+	if len(in.GetLabels()) > 0 {
+		att["labels"] = in.GetLabels()
+	}
+	if len(in.GetAnnotations()) > 0 {
+		att["annotations"] = in.GetAnnotations()
+	}
+
+	return att
+}
+
+func flattenPodEphemeralVolumeClaimTemplate(in *v1.PersistentVolumeClaimTemplate) []interface{} {
+	att := make(map[string]interface{})
+
+	m := flattenPersistentVolumeClaimMetadata(in.ObjectMeta)
+	if len(m) > 0 {
+		att["metadata"] = []interface{}{m}
+	}
+
+	att["spec"] = flattenPersistentVolumeClaimSpec(in.Spec)
+
+	return []interface{}{att}
+}
+
+func flattenPodEphemeralVolumeSource(in *v1.EphemeralVolumeSource) []interface{} {
+	return []interface{}{map[string]interface{}{
+		"volume_claim_template": flattenPodEphemeralVolumeClaimTemplate(in.VolumeClaimTemplate),
+	}}
+}
+
 // Expanders
+
+func expandPodTargetState(p []interface{}) []string {
+	if len(p) > 0 {
+		t := make([]string, len(p))
+		for i, v := range p {
+			t[i] = v.(string)
+		}
+		return t
+	}
+
+	return []string{string(v1.PodRunning)}
+}
 
 func expandPodSpec(p []interface{}) (*v1.PodSpec, error) {
 	obj := &v1.PodSpec{}
@@ -757,6 +828,10 @@ func expandPodSpec(p []interface{}) (*v1.PodSpec, error) {
 		obj.NodeSelector = nodeSelectors
 	}
 
+	if v, ok := in["os"].([]interface{}); ok && len(v) != 0 {
+		obj.OS = expandOS(v)
+	}
+
 	if v, ok := in["runtime_class_name"].(string); ok && v != "" {
 		obj.RuntimeClassName = ptrToString(v)
 	}
@@ -775,6 +850,10 @@ func expandPodSpec(p []interface{}) (*v1.PodSpec, error) {
 			return obj, err
 		}
 		obj.SecurityContext = ctx
+	}
+
+	if v, ok := in["scheduler_name"].(string); ok {
+		obj.SchedulerName = v
 	}
 
 	if v, ok := in["service_account_name"].(string); ok {
@@ -822,6 +901,67 @@ func expandPodSpec(p []interface{}) (*v1.PodSpec, error) {
 	}
 
 	return obj, nil
+}
+
+func expandOS(l []interface{}) *v1.PodOS {
+	if len(l) == 0 || l[0] == nil {
+		return nil
+	}
+
+	in := l[0].(map[string]interface{})
+
+	return &v1.PodOS{
+		Name: v1.OSName(in["name"].(string)),
+	}
+}
+
+func expandWindowsOptions(l []interface{}) *v1.WindowsSecurityContextOptions {
+	if len(l) == 0 || l[0] == nil {
+		return &v1.WindowsSecurityContextOptions{}
+	}
+
+	in := l[0].(map[string]interface{})
+	obj := &v1.WindowsSecurityContextOptions{}
+
+	if v, ok := in["gmsa_credential_spec"].(string); ok {
+		obj.GMSACredentialSpec = ptrToString(v)
+	}
+
+	if v, ok := in["host_process"].(bool); ok {
+		obj.HostProcess = ptrToBool(v)
+	}
+
+	if v, ok := in["gmsa_credential_spec_name"].(string); ok {
+		obj.GMSACredentialSpecName = ptrToString(v)
+	}
+
+	if v, ok := in["run_as_username"].(string); ok {
+		obj.RunAsUserName = ptrToString(v)
+	}
+
+	return obj
+}
+
+func flattenWindowsOptions(in v1.WindowsSecurityContextOptions) []interface{} {
+	att := make(map[string]interface{})
+
+	if in.GMSACredentialSpec != nil {
+		att["gmsa_credential_spec"] = *in.GMSACredentialSpec
+	}
+
+	if in.GMSACredentialSpecName != nil {
+		att["gmsa_credential_spec_name"] = *in.GMSACredentialSpecName
+	}
+
+	if in.HostProcess != nil {
+		att["host_process"] = *in.HostProcess
+	}
+
+	if in.RunAsUserName != nil {
+		att["run_as_username"] = *in.RunAsUserName
+	}
+
+	return []interface{}{att}
 }
 
 func expandPodDNSConfig(l []interface{}) (*v1.PodDNSConfig, error) {
@@ -911,6 +1051,9 @@ func expandPodSecurityContext(l []interface{}) (*v1.PodSecurityContext, error) {
 	if v, ok := in["fs_group_change_policy"].(string); ok && v != "" {
 		policy := v1.PodFSGroupChangePolicy(v)
 		obj.FSGroupChangePolicy = &policy
+	}
+	if v, ok := in["windows_options"].([]interface{}); ok && len(v) > 0 {
+		obj.WindowsOptions = expandWindowsOptions(v)
 	}
 	return obj, nil
 }
@@ -1502,6 +1645,13 @@ func expandVolumes(volumes []interface{}) ([]v1.Volume, error) {
 		}
 		if v, ok := m["photon_persistent_disk"].([]interface{}); ok && len(v) > 0 {
 			vl[i].PhotonPersistentDisk = expandPhotonPersistentDiskVolumeSource(v)
+		}
+		if v, ok := m["ephemeral"].([]interface{}); ok && len(v) > 0 {
+			ephemeral, err := expandEphemeralVolumeSource(v)
+			if err != nil {
+				return vl, err
+			}
+			vl[i].Ephemeral = ephemeral
 		}
 	}
 	return vl, nil

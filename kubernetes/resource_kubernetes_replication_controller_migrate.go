@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package kubernetes
 
 import (
@@ -7,7 +10,7 @@ import (
 )
 
 func resourceKubernetesReplicationControllerV0() *schema.Resource {
-	schemaV1 := resourceKubernetesReplicationControllerSchemaV1()
+	schemaV1 := resourceKubernetesReplicationControllerV1Schema()
 	schemaV0 := patchTemplatePodSpecWithResourcesFieldV0(schemaV1)
 	return &schema.Resource{Schema: schemaV0}
 }

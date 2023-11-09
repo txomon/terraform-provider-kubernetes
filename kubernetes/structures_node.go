@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package kubernetes
 
 import (
@@ -20,6 +23,17 @@ func flattenNodeSpec(in v1.NodeSpec) []interface{} {
 		att["taints"] = flattenNodeTaints(in.Taints...)
 	}
 	return []interface{}{att}
+}
+
+func flattenAddresses(in ...v1.NodeAddress) []interface{} {
+	out := make([]interface{}, len(in))
+	for i, address := range in {
+		m := make(map[string]interface{})
+		m["address"] = address.Address
+		m["type"] = address.Type
+		out[i] = m
+	}
+	return out
 }
 
 func flattenNodeInfo(in v1.NodeSystemInfo) []interface{} {
@@ -59,6 +73,7 @@ func flattenNodeInfo(in v1.NodeSystemInfo) []interface{} {
 
 func flattenNodeStatus(in v1.NodeStatus) []interface{} {
 	att := make(map[string]interface{})
+	att["addresses"] = flattenAddresses(in.Addresses...)
 	att["allocatable"] = flattenResourceList(in.Allocatable)
 	att["capacity"] = flattenResourceList(in.Capacity)
 	att["node_info"] = flattenNodeInfo(in.NodeInfo)
@@ -66,7 +81,7 @@ func flattenNodeStatus(in v1.NodeStatus) []interface{} {
 }
 
 func flattenNodeTaints(in ...v1.Taint) []interface{} {
-	out := make([]interface{}, len(in), len(in))
+	out := make([]interface{}, len(in))
 	for i, taint := range in {
 		m := make(map[string]interface{})
 		m["key"] = taint.Key

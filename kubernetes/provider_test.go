@@ -1,9 +1,13 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package kubernetes
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,11 +24,8 @@ import (
 
 // Global constants for testing images (reduces the number of docker pulls).
 const (
-	nginxImageVersion    = "nginx:1.19.4"
-	nginxImageVersion1   = "nginx:1.19.3"
-	busyboxImageVersion  = "busybox:1.32.0"
-	busyboxImageVersion1 = "busybox:1.31"
-	alpineImageVersion   = "alpine:3.12.1"
+	busyboxImage = "busybox:1.36"
+	agnhostImage = "registry.k8s.io/e2e-test-images/agnhost:2.43"
 )
 
 var testAccProvider *schema.Provider
@@ -117,6 +118,7 @@ func unsetEnv(t *testing.T) func() {
 		"KUBE_CLIENT_KEY_DATA":      e.ClientKeyData,
 		"KUBE_CLUSTER_CA_CERT_DATA": e.ClusterCACertData,
 		"KUBE_INSECURE":             e.Insecure,
+		"KUBE_TLS_SERVER_NAME":      e.TLSServerName,
 		"KUBE_TOKEN":                e.Token,
 	}
 
@@ -147,6 +149,7 @@ func getEnv() *currentEnv {
 		ClientKeyData:     os.Getenv("KUBE_CLIENT_KEY_DATA"),
 		ClusterCACertData: os.Getenv("KUBE_CLUSTER_CA_CERT_DATA"),
 		Insecure:          os.Getenv("KUBE_INSECURE"),
+		TLSServerName:     os.Getenv("KUBE_TLS_SERVER_NAME"),
 		Token:             os.Getenv("KUBE_TOKEN"),
 	}
 	if v := os.Getenv("KUBE_CONFIG_PATH"); v != "" {
@@ -212,6 +215,14 @@ func getClusterVersion() (*gversion.Version, error) {
 	}
 
 	return gversion.NewVersion(serverVersion.String())
+}
+
+func setClusterVersionVar(t *testing.T, varName string) {
+	cv, err := getClusterVersion()
+	if err != nil {
+		t.Skip(fmt.Sprint("Could not get cluster version"))
+	}
+	os.Setenv(varName, fmt.Sprintf("v%s", cv.Core().Original()))
 }
 
 func skipIfClusterVersionLessThan(t *testing.T, vs string) {
@@ -284,6 +295,16 @@ func skipIfNotRunningInEks(t *testing.T) {
 	}
 }
 
+func skipIfRunningInAks(t *testing.T) {
+	isInAks, err := isRunningInAks()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if isInAks {
+		t.Skip("This test cannot be run in AKS cluster")
+	}
+}
+
 func skipIfRunningInEks(t *testing.T) {
 	isInEks, err := isRunningInEks()
 	if err != nil {
@@ -294,6 +315,16 @@ func skipIfRunningInEks(t *testing.T) {
 	}
 }
 
+func skipIfRunningInGke(t *testing.T) {
+	isInGke, err := isRunningInGke()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if isInGke {
+		t.Skip("This test cannot be run in GKE cluster")
+	}
+}
+
 func skipIfNotRunningInMinikube(t *testing.T) {
 	isInMinikube, err := isRunningInMinikube()
 	if err != nil {
@@ -301,6 +332,16 @@ func skipIfNotRunningInMinikube(t *testing.T) {
 	}
 	if !isInMinikube {
 		t.Skip("The Kubernetes endpoint must come from Minikube for this test to run - skipping")
+	}
+}
+
+func skipIfNotRunningInKind(t *testing.T) {
+	isRunningInKind, err := isRunningInKind()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !isRunningInKind {
+		t.Skip("The Kubernetes endpoint must come from Kind for this test to run - skipping")
 	}
 }
 
@@ -326,6 +367,21 @@ func isRunningInMinikube() (bool, error) {
 
 	labels := node.GetLabels()
 	if v, ok := labels["kubernetes.io/hostname"]; ok && v == "minikube" {
+		return true, nil
+	}
+	return false, nil
+}
+
+func isRunningInKind() (bool, error) {
+	node, err := getFirstNode()
+	if err != nil {
+		return false, err
+	}
+	u, err := url.Parse(node.Spec.ProviderID)
+	if err != nil {
+		return false, err
+	}
+	if u.Scheme == "kind" {
 		return true, nil
 	}
 	return false, nil
@@ -438,5 +494,6 @@ type currentEnv struct {
 	ClientKeyData     string
 	ClusterCACertData string
 	Insecure          string
+	TLSServerName     string
 	Token             string
 }

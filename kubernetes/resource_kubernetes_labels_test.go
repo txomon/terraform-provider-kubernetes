@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package kubernetes
 
 import (
@@ -17,7 +20,7 @@ func TestAccKubernetesLabels_basic(t *testing.T) {
 	namespace := "default"
 	resourceName := "kubernetes_labels.test"
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck: func() {
 			testAccPreCheck(t)
 			createConfigMap(name, namespace)

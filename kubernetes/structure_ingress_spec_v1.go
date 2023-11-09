@@ -1,8 +1,9 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package kubernetes
 
 import (
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-
 	v1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
 )
@@ -10,7 +11,7 @@ import (
 // Flatteners
 
 func flattenIngressV1Rule(in []networking.IngressRule) []interface{} {
-	att := make([]interface{}, len(in), len(in))
+	att := make([]interface{}, len(in))
 	for i, r := range in {
 		m := make(map[string]interface{})
 
@@ -25,7 +26,7 @@ func flattenIngressV1RuleHttp(in *networking.HTTPIngressRuleValue) []interface{}
 	if in == nil {
 		return []interface{}{}
 	}
-	pathAtts := make([]interface{}, len(in.Paths), len(in.Paths))
+	pathAtts := make([]interface{}, len(in.Paths))
 	for i, p := range in.Paths {
 		path := map[string]interface{}{
 			"path":    p.Path,
@@ -102,7 +103,7 @@ func flattenIngressV1Spec(in networking.IngressSpec) []interface{} {
 }
 
 func flattenIngressV1TLS(in []networking.IngressTLS) []interface{} {
-	att := make([]interface{}, len(in), len(in))
+	att := make([]interface{}, len(in))
 
 	for i, v := range in {
 		m := make(map[string]interface{})
@@ -115,13 +116,29 @@ func flattenIngressV1TLS(in []networking.IngressTLS) []interface{} {
 	return att
 }
 
+func flattenIngressV1Status(in networking.IngressLoadBalancerStatus) []interface{} {
+	out := make([]interface{}, len(in.Ingress))
+	for i, ingress := range in.Ingress {
+		out[i] = map[string]interface{}{
+			"ip":       ingress.IP,
+			"hostname": ingress.Hostname,
+		}
+	}
+
+	return []interface{}{
+		map[string][]interface{}{
+			"ingress": out,
+		},
+	}
+}
+
 // Expanders
 
 func expandIngressV1Rule(l []interface{}) []networking.IngressRule {
 	if len(l) == 0 || l[0] == nil {
 		return []networking.IngressRule{}
 	}
-	obj := make([]networking.IngressRule, len(l), len(l))
+	obj := make([]networking.IngressRule, len(l))
 	for i, n := range l {
 		cfg := n.(map[string]interface{})
 
@@ -133,7 +150,7 @@ func expandIngressV1Rule(l []interface{}) []networking.IngressRule {
 				http := h.(map[string]interface{})
 				if v, ok := http["path"]; ok {
 					pathList := v.([]interface{})
-					paths = make([]networking.HTTPIngressPath, len(pathList), len(pathList))
+					paths = make([]networking.HTTPIngressPath, len(pathList))
 					for i, path := range pathList {
 						p := path.(map[string]interface{})
 						t := networking.PathType(p["path_type"].(string))
@@ -239,7 +256,7 @@ func expandIngressV1TLS(l []interface{}) []networking.IngressTLS {
 		return nil
 	}
 
-	tlsList := make([]networking.IngressTLS, len(l), len(l))
+	tlsList := make([]networking.IngressTLS, len(l))
 	for i, t := range l {
 		in := t.(map[string]interface{})
 		obj := networking.IngressTLS{}
@@ -255,32 +272,4 @@ func expandIngressV1TLS(l []interface{}) []networking.IngressTLS {
 	}
 
 	return tlsList
-}
-
-// Patch Ops
-
-func patchIngressV1Spec(keyPrefix, pathPrefix string, d *schema.ResourceData) PatchOperations {
-	ops := make([]PatchOperation, 0, 0)
-	if d.HasChange(keyPrefix + "backend") {
-		ops = append(ops, &ReplaceOperation{
-			Path:  pathPrefix + "backend",
-			Value: expandIngressV1Backend(d.Get(keyPrefix + "backend").([]interface{})),
-		})
-	}
-
-	if d.HasChange(keyPrefix + "rule") {
-		ops = append(ops, &ReplaceOperation{
-			Path:  pathPrefix + "rules",
-			Value: expandIngressV1Rule(d.Get(keyPrefix + "rule").([]interface{})),
-		})
-	}
-
-	if d.HasChange(keyPrefix + "tls") {
-		ops = append(ops, &ReplaceOperation{
-			Path:  pathPrefix + "tls",
-			Value: expandIngressV1TLS(d.Get(keyPrefix + "tls").([]interface{})),
-		})
-	}
-
-	return ops
 }

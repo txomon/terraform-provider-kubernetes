@@ -26,6 +26,7 @@ resource "kubernetes_cron_job_v1" "demo" {
     concurrency_policy            = "Replace"
     failed_jobs_history_limit     = 5
     schedule                      = "1 0 * * *"
+    timezone                      = "Etc/UTC"
     starting_deadline_seconds     = 10
     successful_jobs_history_limit = 10
     job_template {
@@ -53,8 +54,8 @@ resource "kubernetes_cron_job_v1" "demo" {
 
 The following arguments are supported:
 
-* `metadata` - (Required) Standard resource's metadata. For more info: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-* `spec` - (Required) Spec defines the behavior of a CronJob. https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+* `metadata` - (Required) Standard resource's metadata. For more info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+* `spec` - (Required) Spec defines the behavior of a CronJob. https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 
 ## Nested Blocks
 
@@ -64,21 +65,21 @@ The following arguments are supported:
 
 * `annotations` - (Optional) An unstructured key value map stored with the resource that may be used to store arbitrary metadata.
 
-~> By default, the provider ignores any annotations whose key names end with *kubernetes.io*. This is necessary because such annotations can be mutated by server-side components and consequently cause a perpetual diff in the Terraform plan output. If you explicitly specify any such annotations in the configuration template then Terraform will consider these as normal resource attributes and manage them as expected (while still avoiding the perpetual diff problem). For more info: http://kubernetes.io/docs/user-guide/annotations
+~> By default, the provider ignores any annotations whose key names end with *kubernetes.io*. This is necessary because such annotations can be mutated by server-side components and consequently cause a perpetual diff in the Terraform plan output. If you explicitly specify any such annotations in the configuration template then Terraform will consider these as normal resource attributes and manage them as expected (while still avoiding the perpetual diff problem). For more info: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
 
 * `generate_name` - (Optional) Prefix, used by the server, to generate a unique name ONLY IF the `name` field has not been provided. This value will also be combined with a unique suffix. Read more: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#idempotency
 * `labels` - (Optional) Map of string keys and values that can be used to organize and categorize (scope and select) the service. May match selectors of replication controllers and services. 
 
-~> By default, the provider ignores any labels whose key names end with *kubernetes.io*. This is necessary because such labels can be mutated by server-side components and consequently cause a perpetual diff in the Terraform plan output. If you explicitly specify any such labels in the configuration template then Terraform will consider these as normal resource attributes and manage them as expected (while still avoiding the perpetual diff problem). For more info: http://kubernetes.io/docs/user-guide/labels
+~> By default, the provider ignores any labels whose key names end with *kubernetes.io*. This is necessary because such labels can be mutated by server-side components and consequently cause a perpetual diff in the Terraform plan output. If you explicitly specify any such labels in the configuration template then Terraform will consider these as normal resource attributes and manage them as expected (while still avoiding the perpetual diff problem). For more info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
 
-* `name` - (Optional) Name of the service, must be unique. Cannot be updated. For more info: http://kubernetes.io/docs/user-guide/identifiers#names
+* `name` - (Optional) Name of the service, must be unique. Cannot be updated. For more info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
 * `namespace` - (Optional) Namespace defines the space within which name of the service must be unique.
 
 #### Attributes
 
 * `generation` - A sequence number representing a specific generation of the desired state.
 * `resource_version` - An opaque value that represents the internal version of this service that can be used by clients to determine when service has changed. Read more: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
-* `uid` - The unique in time and space value for this service. For more info: http://kubernetes.io/docs/user-guide/identifiers#uids
+* `uid` - The unique in time and space value for this service. For more info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
 
 ### `spec`
 
@@ -88,6 +89,7 @@ The following arguments are supported:
 * `failed_jobs_history_limit` - (Optional) The number of failed finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1.
 * `job_template` - (Required) Specifies the job that will be created when executing a CronJob.
 * `schedule` - (Required) The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
+* `timezone` - (Optional) The time zone for the given schedule. If not specified, this will rely on the time zone of the kube-controller-manager process.
 * `starting_deadline_seconds` - (Optional) Deadline in seconds for starting the job if it misses scheduled time for any reason. Missed jobs executions will be counted as failed ones.
 * `successful_jobs_history_limit` - (Optional) The number of successful finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified. Defaults to 3.
 * `suspend` - (Optional) This flag tells the controller to suspend subsequent executions, it does not apply to already started executions. Defaults to false.
@@ -97,7 +99,7 @@ The following arguments are supported:
 #### Arguments
 
 * `metadata` - (Required) Standard object's metadata of the jobs created from this template. For more info: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#metadata
-* `spec` - (Required) Specification of the desired behavior of the job. For more info: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+* `spec` - (Required) Specification of the desired behavior of the job. For more info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 
 ### `spec`
 
@@ -125,4 +127,4 @@ The following arguments are supported:
 
 These arguments are the same as the for the `spec` block of a Pod.
 
-Please see the [Pod resource](pod.html#spec-1) for reference.
+Please see the [Pod resource](pod.html#spec) for reference.

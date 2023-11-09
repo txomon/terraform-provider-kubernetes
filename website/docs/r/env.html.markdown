@@ -41,7 +41,8 @@ The following arguments are supported:
 * `api_version` - (Required) The apiVersion of the resource to add environment variables to.
 * `kind` - (Required) The kind of the resource to add environment variables to.
 * `metadata` - (Required) Standard metadata of the resource to add environment variables to. 
-* `container` - (Required) Name of the container for which we are updating the environment variables.
+* `container` - (Optional) Name of the container for which we are updating the environment variables.
+* `init_container` - (Optional) Name of the initContainer for which we are updating the environment variables.
 * `env` - (Required) Value block with custom values used to represent environment variables
 * `force` - (Optional) Force management of environment variables if there is a conflict.
 * `field_manager` - (Optional) The name of the [field manager](https://kubernetes.io/docs/reference/using-api/server-side-apply/#field-management). Defaults to `Terraform`.
@@ -77,7 +78,7 @@ The following arguments are supported:
 #### Arguments
 
 * `key` - (Optional) The key to select.
-* `name` - (Optional) Name of the referent. For more info see [Kubernetes reference](http://kubernetes.io/docs/user-guide/identifiers#names)
+* `name` - (Optional) Name of the referent. For more info see [Kubernetes reference](https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names)
 * `optional` - (Optional) Specify whether the Secret or its key must be defined
 
 ### `field_ref`
@@ -100,7 +101,7 @@ The following arguments are supported:
 #### Arguments
 
 * `key` - (Optional) The key of the secret to select from. Must be a valid secret key.
-* `name` - (Optional) Name of the referent. For more info see [Kubernetes reference](http://kubernetes.io/docs/user-guide/identifiers#names)
+* `name` - (Optional) Name of the referent. For more info see [Kubernetes reference](https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names)
 * `optional` - (Optional) Specify whether the Secret or its key must be defined
 
 
