@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
 // TestAccKubernetesDataSourceConfigMap_basic tests that the data source is able to read
@@ -41,6 +41,25 @@ func TestAccKubernetesDataSourceConfigMapV1_basic(t *testing.T) {
 					resource.TestCheckResourceAttr(dataSourceName, "metadata.0.labels.TestLabelOne", "one"),
 					resource.TestCheckResourceAttr(dataSourceName, "data.one", "first"),
 					resource.TestCheckResourceAttr(dataSourceName, "binary_data.raw", "UmF3IGRhdGEgc2hvdWxkIGNvbWUgYmFjayBhcyBpcyBpbiB0aGUgcG9k"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccKubernetesDataSourceConfigMapV1_not_found(t *testing.T) {
+	dataSourceName := "data.kubernetes_config_map_v1.test"
+	name := fmt.Sprintf("ceci-n.est-pas-une-config-map-%s", acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum))
+
+	resource.ParallelTest(t, resource.TestCase{
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
+		Steps: []resource.TestStep{
+			{ // Use the data source to read the existing resource.
+				Config: testAccKubernetesDataSourceConfigMapV1_nonexistent(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(dataSourceName, "metadata.0.name", name),
+					resource.TestCheckResourceAttr(dataSourceName, "data.%", "0"),
 				),
 			},
 		},
@@ -81,4 +100,13 @@ func testAccKubernetesDataSourceConfigMapV1_read() string {
   }
 }
 `
+}
+
+func testAccKubernetesDataSourceConfigMapV1_nonexistent(name string) string {
+	return fmt.Sprintf(`data "kubernetes_config_map_v1" "test" {
+  metadata {
+    name = "%s"
+  }
+}
+`, name)
 }

@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -14,16 +14,19 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgApi "k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 )
 
-func resourceKubernetesConfigMapV1() *schema.Resource {
+func resourceKubernetesConfigMapV1(deprecationMessage string) *schema.Resource {
 	return &schema.Resource{
-		CreateContext: resourceKubernetesConfigMapV1Create,
-		ReadContext:   resourceKubernetesConfigMapV1Read,
-		UpdateContext: resourceKubernetesConfigMapV1Update,
-		DeleteContext: resourceKubernetesConfigMapV1Delete,
+		Description:        "The resource provides mechanisms to inject containers with configuration data while keeping containers agnostic of Kubernetes. Config Map can be used to store fine-grained information like individual properties or coarse-grained information like entire config files or JSON blobs.",
+		CreateContext:      resourceKubernetesConfigMapV1Create,
+		ReadContext:        resourceKubernetesConfigMapV1Read,
+		DeprecationMessage: deprecationMessage,
+		UpdateContext:      resourceKubernetesConfigMapV1Update,
+		DeleteContext:      resourceKubernetesConfigMapV1Delete,
 		Importer: &schema.ResourceImporter{
-			StateContext: schema.ImportStatePassthroughContext,
+			StateContext: resourceIdentityImportNamespaced,
 		},
 		CustomizeDiff: func(ctx context.Context, diff *schema.ResourceDiff, meta interface{}) error {
 			if diff.Id() == "" {
@@ -48,7 +51,7 @@ func resourceKubernetesConfigMapV1() *schema.Resource {
 
 			return nil
 		},
-
+		Identity: resourceIdentitySchemaNamespaced(),
 		Schema: map[string]*schema.Schema{
 			"metadata": namespacedMetadataSchema("config map", true),
 			"binary_data": {
@@ -82,7 +85,7 @@ func resourceKubernetesConfigMapV1Create(ctx context.Context, d *schema.Resource
 		ObjectMeta: metadata,
 		BinaryData: expandBase64MapToByteMap(d.Get("binary_data").(map[string]interface{})),
 		Data:       expandStringMap(d.Get("data").(map[string]interface{})),
-		Immutable:  ptrToBool(d.Get("immutable").(bool)),
+		Immutable:  ptr.To(d.Get("immutable").(bool)),
 	}
 
 	log.Printf("[INFO] Creating new config map: %#v", cfgMap)
@@ -91,7 +94,7 @@ func resourceKubernetesConfigMapV1Create(ctx context.Context, d *schema.Resource
 		return diag.FromErr(err)
 	}
 	log.Printf("[INFO] Submitted new config map: %#v", out)
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 
 	return resourceKubernetesConfigMapV1Read(ctx, d, meta)
 }
@@ -110,7 +113,7 @@ func resourceKubernetesConfigMapV1Read(ctx context.Context, d *schema.ResourceDa
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -130,6 +133,16 @@ func resourceKubernetesConfigMapV1Read(ctx context.Context, d *schema.ResourceDa
 	d.Set("data", cfgMap.Data)
 	d.Set("immutable", cfgMap.Immutable)
 
+	rid, err := d.Identity()
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	rid.Set("api_version", "v1")
+	rid.Set("kind", "ConfigMap")
+	rid.Set("namespace", cfgMap.GetNamespace())
+	rid.Set("name", cfgMap.GetName())
+
 	return nil
 }
 
@@ -139,7 +152,7 @@ func resourceKubernetesConfigMapV1Update(ctx context.Context, d *schema.Resource
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -147,20 +160,20 @@ func resourceKubernetesConfigMapV1Update(ctx context.Context, d *schema.Resource
 	ops := patchMetadata("metadata.0.", "/metadata/", d)
 	if d.HasChange("binary_data") {
 		oldV, newV := d.GetChange("binary_data")
-		diffOps := diffStringMap("/binaryData/", oldV.(map[string]interface{}), newV.(map[string]interface{}))
+		diffOps := DiffStringMap("/binaryData/", oldV.(map[string]interface{}), newV.(map[string]interface{}))
 		ops = append(ops, diffOps...)
 	}
 
 	if d.HasChange("data") {
 		oldV, newV := d.GetChange("data")
-		diffOps := diffStringMap("/data/", oldV.(map[string]interface{}), newV.(map[string]interface{}))
+		diffOps := DiffStringMap("/data/", oldV.(map[string]interface{}), newV.(map[string]interface{}))
 		ops = append(ops, diffOps...)
 	}
 
 	if d.HasChange("immutable") {
 		ops = append(ops, &ReplaceOperation{
 			Path:  "/immutable",
-			Value: ptrToBool(d.Get("immutable").(bool)),
+			Value: ptr.To(d.Get("immutable").(bool)),
 		})
 	}
 
@@ -175,7 +188,7 @@ func resourceKubernetesConfigMapV1Update(ctx context.Context, d *schema.Resource
 		return diag.Errorf("Failed to update Config Map: %s", err)
 	}
 	log.Printf("[INFO] Submitted updated config map: %#v", out)
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 
 	return resourceKubernetesConfigMapV1Read(ctx, d, meta)
 }
@@ -186,7 +199,7 @@ func resourceKubernetesConfigMapV1Delete(ctx context.Context, d *schema.Resource
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -211,7 +224,7 @@ func resourceKubernetesConfigMapV1Exists(ctx context.Context, d *schema.Resource
 		return false, err
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return false, err
 	}

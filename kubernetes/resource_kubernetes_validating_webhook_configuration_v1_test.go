@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -9,11 +9,15 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
+	"github.com/hashicorp/terraform-plugin-testing/statecheck"
+	"github.com/hashicorp/terraform-plugin-testing/tfversion"
 )
 
 func TestAccKubernetesValidatingWebhookConfigurationV1_basic(t *testing.T) {
@@ -26,8 +30,7 @@ func TestAccKubernetesValidatingWebhookConfigurationV1_basic(t *testing.T) {
 			// AKS sets up some namespaceSelectors and thus we have to skip these tests
 			skipIfRunningInAks(t)
 		},
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
+
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesValdiatingWebhookConfigurationV1Destroy,
 		Steps: []resource.TestStep{
@@ -146,9 +149,45 @@ func TestAccKubernetesValidatingWebhookConfigurationV1_basic(t *testing.T) {
 	})
 }
 
+func TestAccKubernetesValidatingWebhookConfigurationV1_identity(t *testing.T) {
+	name := fmt.Sprintf("acc-test-%v.terraform.io", acctest.RandString(10))
+	resourceName := "kubernetes_validating_webhook_configuration_v1.test"
+
+	resource.ParallelTest(t, resource.TestCase{
+		PreCheck: func() {
+			testAccPreCheck(t)
+			// AKS sets up some namespaceSelectors and thus we have to skip these tests
+			skipIfRunningInAks(t)
+		},
+		TerraformVersionChecks: []tfversion.TerraformVersionCheck{
+			tfversion.SkipBelow(tfversion.Version1_12_0),
+		},
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckKubernetesValdiatingWebhookConfigurationV1Destroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccKubernetesValidatingWebhookConfigurationV1Config_basic(name),
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectIdentity(
+						resourceName, map[string]knownvalue.Check{
+							"name":        knownvalue.StringExact(name),
+							"api_version": knownvalue.StringExact("admissionregistration.k8s.io/v1"),
+							"kind":        knownvalue.StringExact("ValidatingWebhookConfiguration"),
+						},
+					),
+				},
+			},
+			{
+				ResourceName:    resourceName,
+				ImportState:     true,
+				ImportStateKind: resource.ImportBlockWithResourceIdentity,
+			},
+		},
+	})
+}
+
 func testAccCheckKubernetesValdiatingWebhookConfigurationV1Destroy(s *terraform.State) error {
 	conn, err := testAccProvider.Meta().(KubeClientsets).MainClientset()
-
 	if err != nil {
 		return err
 	}
@@ -198,8 +237,7 @@ func testAccCheckKubernetesValidatingWebhookConfigurationV1Exists(n string) reso
 }
 
 func testAccKubernetesValidatingWebhookConfigurationV1Config_basic(name string) string {
-	return fmt.Sprintf(`
-resource "kubernetes_validating_webhook_configuration_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_validating_webhook_configuration_v1" "test" {
   metadata {
     name = %q
   }
@@ -235,8 +273,7 @@ resource "kubernetes_validating_webhook_configuration_v1" "test" {
 }
 
 func testAccKubernetesValidatingWebhookConfigurationV1Config_modified(name string) string {
-	return fmt.Sprintf(`
-resource "kubernetes_validating_webhook_configuration_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_validating_webhook_configuration_v1" "test" {
   metadata {
     name = %q
   }
@@ -291,8 +328,7 @@ resource "kubernetes_validating_webhook_configuration_v1" "test" {
 }
 
 func testAccKubernetesValidatingWebhookConfigurationV1Config_without_rules(name string) string {
-	return fmt.Sprintf(`
-resource "kubernetes_validating_webhook_configuration_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_validating_webhook_configuration_v1" "test" {
   metadata {
     name = %q
   }

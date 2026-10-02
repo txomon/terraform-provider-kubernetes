@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 )
 
 func flattenDaemonSetSpec(in appsv1.DaemonSetSpec, d *schema.ResourceData, meta interface{}) ([]interface{}, error) {
@@ -23,13 +24,13 @@ func flattenDaemonSetSpec(in appsv1.DaemonSetSpec, d *schema.ResourceData, meta 
 		att["selector"] = flattenLabelSelector(in.Selector)
 	}
 
-	podSpec, err := flattenPodSpec(in.Template.Spec)
+	podSpec, err := flattenPodSpec(in.Template.Spec, true)
 	if err != nil {
 		return nil, err
 	}
 	template := make(map[string]interface{})
 	template["spec"] = podSpec
-	template["metadata"] = flattenMetadata(in.Template.ObjectMeta, d, meta, "spec.0.template.0.")
+	template["metadata"] = flattenMetadataFields(in.Template.ObjectMeta)
 	att["template"] = []interface{}{template}
 
 	return []interface{}{att}, nil
@@ -48,6 +49,10 @@ func flattenDaemonSetStrategy(in appsv1.DaemonSetUpdateStrategy) []interface{} {
 
 func flattenDaemonSetStrategyRollingUpdate(in *appsv1.RollingUpdateDaemonSet) []interface{} {
 	att := make(map[string]interface{})
+	if in.MaxSurge != nil {
+		att["max_surge"] = in.MaxSurge.String()
+	}
+
 	if in.MaxUnavailable != nil {
 		att["max_unavailable"] = in.MaxUnavailable.String()
 	}
@@ -64,7 +69,7 @@ func expandDaemonSetSpec(daemonset []interface{}) (appsv1.DaemonSetSpec, error) 
 	in := daemonset[0].(map[string]interface{})
 
 	obj.MinReadySeconds = int32(in["min_ready_seconds"].(int))
-	obj.RevisionHistoryLimit = ptrToInt32(int32(in["revision_history_limit"].(int)))
+	obj.RevisionHistoryLimit = ptr.To(int32(in["revision_history_limit"].(int)))
 
 	if v, ok := in["selector"].([]interface{}); ok && len(v) > 0 {
 		obj.Selector = expandLabelSelector(v)
@@ -107,6 +112,11 @@ func expandRollingUpdateDaemonSet(p []interface{}) *appsv1.RollingUpdateDaemonSe
 		return nil
 	}
 	in := p[0].(map[string]interface{})
+
+	if v, ok := in["max_surge"].(string); ok {
+		val := intstr.Parse(v)
+		obj.MaxSurge = &val
+	}
 
 	if v, ok := in["max_unavailable"].(string); ok {
 		val := intstr.Parse(v)

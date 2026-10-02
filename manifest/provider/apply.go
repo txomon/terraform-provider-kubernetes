@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package provider
@@ -20,9 +20,11 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
-var defaultCreateTimeout = "10m"
-var defaultUpdateTimeout = "10m"
-var defaultDeleteTimeout = "10m"
+var (
+	defaultCreateTimeout = "10m"
+	defaultUpdateTimeout = "10m"
+	defaultDeleteTimeout = "10m"
+)
 
 // ApplyResourceChange function
 func (s *RawProviderServer) ApplyResourceChange(ctx context.Context, req *tfprotov5.ApplyResourceChangeRequest) (*tfprotov5.ApplyResourceChangeResponse, error) {
@@ -482,6 +484,15 @@ func (s *RawProviderServer) ApplyResourceChange(ctx context.Context, req *tfprot
 			return resp, err
 		}
 		resp.NewState = &newResState
+
+		// set resource identity data
+		idData, err := createIdentityData(result)
+		if err != nil {
+			return resp, err
+		}
+		resp.NewIdentity = &tfprotov5.ResourceIdentityData{
+			IdentityData: &idData,
+		}
 	case applyPlannedState.IsNull():
 		// Delete the resource
 		priorStateVal := make(map[string]tftypes.Value)
@@ -540,16 +551,25 @@ func (s *RawProviderServer) ApplyResourceChange(ctx context.Context, req *tfprot
 
 		err = rs.Delete(ctxDeadline, rname, metav1.DeleteOptions{})
 		if err != nil {
-			rn := types.NamespacedName{Namespace: rnamespace, Name: rname}.String()
-			resp.Diagnostics = append(resp.Diagnostics,
-				&tfprotov5.Diagnostic{
-					Severity: tfprotov5.DiagnosticSeverityError,
-					Summary:  fmt.Sprintf("Error deleting resource %s: %s", rn, err),
-					Detail:   err.Error(),
-				})
+			if apierrors.IsNotFound(err) {
+				s.logger.Trace("[ApplyResourceChange][Delete]", "Resource is already deleted")
+
+				resp.Diagnostics = append(resp.Diagnostics,
+					&tfprotov5.Diagnostic{
+						Severity: tfprotov5.DiagnosticSeverityWarning,
+						Summary:  fmt.Sprintf("Resource %q was already deleted", rname),
+						Detail:   fmt.Sprintf("The resource %q was not found in the Kubernetes API. This may be due to the resource being already deleted.", rname),
+					})
+			} else {
+				resp.Diagnostics = append(resp.Diagnostics,
+					&tfprotov5.Diagnostic{
+						Severity: tfprotov5.DiagnosticSeverityError,
+						Summary:  fmt.Sprintf("Error deleting resource %s: %s", rname, err),
+						Detail:   err.Error(),
+					})
+			}
 			return resp, nil
 		}
-
 		// wait for delete
 		for {
 			if time.Now().After(deadline) {

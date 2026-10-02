@@ -1,18 +1,21 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
 
 import (
 	"context"
+	"log"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func dataSourceKubernetesPersistentVolumeV1() *schema.Resource {
 	return &schema.Resource{
+		Description: "A PersistentVolume (PV) is a piece of networked storage in the cluster provisioned by an administrator. It is a resource in the cluster just like a node is a cluster resource. Persistent Volumes have a lifecycle independent of any individual pod that uses the PV. This data source retrieves information about the specified PV.",
 		ReadContext: dataSourceKubernetesPersistentVolumeV1Read,
 
 		Schema: map[string]*schema.Schema{
@@ -33,6 +36,7 @@ func dataSourceKubernetesPersistentVolumeV1() *schema.Resource {
 									"ReadWriteOnce",
 									"ReadOnlyMany",
 									"ReadWriteMany",
+									"ReadWriteOncePod",
 								}, false),
 							},
 							Set: schema.HashString,
@@ -145,7 +149,31 @@ func dataSourceKubernetesPersistentVolumeV1() *schema.Resource {
 }
 
 func dataSourceKubernetesPersistentVolumeV1Read(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
-	name := d.Get("metadata.0.name").(string)
-	d.SetId(name)
-	return resourceKubernetesPersistentVolumeV1Read(ctx, d, meta)
+	conn, err := meta.(KubeClientsets).MainClientset()
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	metadata := expandMetadata(d.Get("metadata").([]interface{}))
+	d.SetId(metadata.Name)
+
+	log.Printf("[INFO] Reading persistent volume %s", metadata.Name)
+	volume, err := conn.CoreV1().PersistentVolumes().Get(ctx, metadata.Name, metav1.GetOptions{})
+	if err != nil {
+		log.Printf("[DEBUG] Received error: %#v", err)
+		return diag.FromErr(err)
+	}
+	log.Printf("[INFO] Received persistent volume: %#v", volume)
+
+	err = d.Set("metadata", flattenMetadataFields(volume.ObjectMeta))
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	err = d.Set("spec", flattenPersistentVolumeSpec(volume.Spec))
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	return nil
 }

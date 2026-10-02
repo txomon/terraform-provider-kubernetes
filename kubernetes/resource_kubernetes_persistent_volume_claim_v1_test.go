@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -11,23 +11,22 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
-	api "k8s.io/api/core/v1"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	corev1 "k8s.io/api/core/v1"
 	storageapi "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestAccKubernetesPersistentVolumeClaimV1_basic(t *testing.T) {
-	var conf api.PersistentVolumeClaim
+	var conf corev1.PersistentVolumeClaim
 	name := fmt.Sprintf("tf-acc-test-%s", acctest.RandString(10))
 	resourceName := "kubernetes_persistent_volume_claim_v1.test"
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesPersistentVolumeClaimV1Destroy,
 		Steps: []resource.TestStep{
@@ -131,8 +130,8 @@ func TestAccKubernetesPersistentVolumeClaimV1_basic(t *testing.T) {
 }
 
 func TestAccKubernetesPersistentVolumeClaimV1_googleCloud_volumeMatch(t *testing.T) {
-	var pvcConf api.PersistentVolumeClaim
-	var pvConf api.PersistentVolume
+	var pvcConf corev1.PersistentVolumeClaim
+	var pvConf corev1.PersistentVolume
 	claimName := fmt.Sprintf("tf-acc-test-%s", acctest.RandString(10))
 	volumeName := fmt.Sprintf("tf-acc-test-%s", acctest.RandString(10))
 	volumeNameModified := fmt.Sprintf("tf-acc-test-%s", acctest.RandString(10))
@@ -141,9 +140,8 @@ func TestAccKubernetesPersistentVolumeClaimV1_googleCloud_volumeMatch(t *testing
 	resourceName := "kubernetes_persistent_volume_claim_v1.test"
 
 	resource.ParallelTest(t, resource.TestCase{
-		PreCheck:          func() { testAccPreCheck(t); skipIfNotRunningInGke(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
+		PreCheck: func() { testAccPreCheck(t); skipIfNotRunningInGke(t) },
+
 		ProviderFactories: testAccProviderFactories,
 		ExternalProviders: testAccExternalProviders,
 		CheckDestroy:      testAccCheckKubernetesPersistentVolumeClaimV1Destroy,
@@ -200,7 +198,7 @@ func TestAccKubernetesPersistentVolumeClaimV1_googleCloud_volumeMatch(t *testing
 // TODO: Re-enable when we build test env for K8S that supports it
 
 // func TestAccKubernetesPersistentVolumeClaim_labelsMatch(t *testing.T) {
-//   var conf api.PersistentVolumeClaim
+//   var conf corev1.PersistentVolumeClaim
 //   claimName := fmt.Sprintf("tf-acc-test-%s", acctest.RandString(10))
 //   volumeName := fmt.Sprintf("tf-acc-test-%s", acctest.RandString(10))
 
@@ -235,7 +233,7 @@ func TestAccKubernetesPersistentVolumeClaimV1_googleCloud_volumeMatch(t *testing
 // }
 
 // func TestAccKubernetesPersistentVolumeClaim_labelsMatchExpression(t *testing.T) {
-//   var conf api.PersistentVolumeClaim
+//   var conf corev1.PersistentVolumeClaim
 //   claimName := fmt.Sprintf("tf-acc-test-%s", acctest.RandString(10))
 //   volumeName := fmt.Sprintf("tf-acc-test-%s", acctest.RandString(10))
 
@@ -275,8 +273,8 @@ func TestAccKubernetesPersistentVolumeClaimV1_googleCloud_volumeMatch(t *testing
 // }
 
 func TestAccKubernetesPersistentVolumeClaimV1_googleCloud_volumeUpdate(t *testing.T) {
-	var pvcConf api.PersistentVolumeClaim
-	var pvConf api.PersistentVolume
+	var pvcConf corev1.PersistentVolumeClaim
+	var pvConf corev1.PersistentVolume
 
 	claimName := fmt.Sprintf("tf-acc-test-%s", acctest.RandString(10))
 	volumeName := fmt.Sprintf("tf-acc-test-%s", acctest.RandString(10))
@@ -285,9 +283,8 @@ func TestAccKubernetesPersistentVolumeClaimV1_googleCloud_volumeUpdate(t *testin
 	resourceName := "kubernetes_persistent_volume_claim_v1.test"
 
 	resource.ParallelTest(t, resource.TestCase{
-		PreCheck:          func() { testAccPreCheck(t); skipIfNotRunningInGke(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
+		PreCheck: func() { testAccPreCheck(t); skipIfNotRunningInGke(t) },
+
 		ProviderFactories: testAccProviderFactories,
 		ExternalProviders: testAccExternalProviders,
 		CheckDestroy:      testAccCheckKubernetesPersistentVolumeClaimV1Destroy,
@@ -337,7 +334,7 @@ func TestAccKubernetesPersistentVolumeClaimV1_googleCloud_volumeUpdate(t *testin
 }
 
 func TestAccKubernetesPersistentVolumeClaimV1_googleCloud_storageClass(t *testing.T) {
-	var pvcConf api.PersistentVolumeClaim
+	var pvcConf corev1.PersistentVolumeClaim
 	var storageClass storageapi.StorageClass
 	var secondStorageClass storageapi.StorageClass
 
@@ -346,9 +343,8 @@ func TestAccKubernetesPersistentVolumeClaimV1_googleCloud_storageClass(t *testin
 	resourceName := "kubernetes_persistent_volume_claim_v1.test"
 
 	resource.ParallelTest(t, resource.TestCase{
-		PreCheck:          func() { testAccPreCheck(t); skipIfNotRunningInGke(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
+		PreCheck: func() { testAccPreCheck(t); skipIfNotRunningInGke(t) },
+
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesPersistentVolumeClaimV1Destroy,
 		Steps: []resource.TestStep{
@@ -404,15 +400,14 @@ func TestAccKubernetesPersistentVolumeClaimV1_googleCloud_storageClass(t *testin
 }
 
 func TestAccKubernetesPersistentVolumeClaimV1_expansionGoogleCloud(t *testing.T) {
-	var conf1, conf2 api.PersistentVolumeClaim
+	var conf1, conf2 corev1.PersistentVolumeClaim
 	name := fmt.Sprintf("tf-acc-test-%s", acctest.RandString(10))
 	imageName := busyboxImage
 	resourceName := "kubernetes_persistent_volume_claim_v1.test"
 
 	resource.ParallelTest(t, resource.TestCase{
-		PreCheck:          func() { testAccPreCheck(t); skipIfNotRunningInGke(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
+		PreCheck: func() { testAccPreCheck(t); skipIfNotRunningInGke(t) },
+
 		ProviderFactories: testAccProviderFactories,
 		ExternalProviders: testAccExternalProviders,
 		CheckDestroy:      testAccCheckKubernetesPersistentVolumeClaimV1Destroy,
@@ -447,14 +442,13 @@ func TestAccKubernetesPersistentVolumeClaimV1_expansionGoogleCloud(t *testing.T)
 }
 
 func TestAccKubernetesPersistentVolumeClaimV1_expansionMinikube(t *testing.T) {
-	var conf1, conf2 api.PersistentVolumeClaim
+	var conf1, conf2 corev1.PersistentVolumeClaim
 	name := fmt.Sprintf("tf-acc-test-%s", acctest.RandString(10))
 	resourceName := "kubernetes_persistent_volume_claim_v1.test"
 
 	resource.ParallelTest(t, resource.TestCase{
-		PreCheck:          func() { testAccPreCheck(t); skipIfNotRunningInMinikube(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
+		PreCheck: func() { testAccPreCheck(t); skipIfNotRunningInMinikube(t) },
+
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesPersistentVolumeClaimV1Destroy,
 		Steps: []resource.TestStep{
@@ -512,6 +506,53 @@ func TestAccKubernetesPersistentVolumeClaimV1_expansionMinikube(t *testing.T) {
 	})
 }
 
+func TestAccKubernetesPersistentVolumeClaimV1_volumeMode(t *testing.T) {
+	var conf corev1.PersistentVolumeClaim
+	name := fmt.Sprintf("tf-acc-test-%s", acctest.RandString(10))
+	resourceName := "kubernetes_persistent_volume_claim_v1.test"
+
+	resource.ParallelTest(t, resource.TestCase{
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckKubernetesPersistentVolumeClaimV1Destroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccKubernetesPersistentVolumeClaimV1Config_volumeModeDefault(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckKubernetesPersistentVolumeClaimV1Exists(resourceName, &conf),
+					resource.TestCheckResourceAttr(resourceName, "metadata.0.name", name),
+					resource.TestCheckResourceAttrSet(resourceName, "metadata.0.generation"),
+					resource.TestCheckResourceAttrSet(resourceName, "metadata.0.resource_version"),
+					resource.TestCheckResourceAttrSet(resourceName, "metadata.0.uid"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.volume_mode", string(corev1.PersistentVolumeFilesystem)),
+				),
+			},
+			{
+				Config: testAccKubernetesPersistentVolumeClaimV1Config_volumeMode(name, string(corev1.PersistentVolumeFilesystem)),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckKubernetesPersistentVolumeClaimV1Exists(resourceName, &conf),
+					resource.TestCheckResourceAttr(resourceName, "metadata.0.name", name),
+					resource.TestCheckResourceAttrSet(resourceName, "metadata.0.generation"),
+					resource.TestCheckResourceAttrSet(resourceName, "metadata.0.resource_version"),
+					resource.TestCheckResourceAttrSet(resourceName, "metadata.0.uid"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.volume_mode", string(corev1.PersistentVolumeFilesystem)),
+				),
+			},
+			{
+				Config: testAccKubernetesPersistentVolumeClaimV1Config_volumeMode(name, string(corev1.PersistentVolumeBlock)),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckKubernetesPersistentVolumeClaimV1Exists(resourceName, &conf),
+					resource.TestCheckResourceAttr(resourceName, "metadata.0.name", name),
+					resource.TestCheckResourceAttrSet(resourceName, "metadata.0.generation"),
+					resource.TestCheckResourceAttrSet(resourceName, "metadata.0.resource_version"),
+					resource.TestCheckResourceAttrSet(resourceName, "metadata.0.uid"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.volume_mode", string(corev1.PersistentVolumeBlock)),
+				),
+			},
+		},
+	})
+}
+
 func testAccCheckKubernetesPersistentVolumeClaimV1Destroy(s *terraform.State) error {
 	conn, err := testAccProvider.Meta().(KubeClientsets).MainClientset()
 	if err != nil {
@@ -524,23 +565,22 @@ func testAccCheckKubernetesPersistentVolumeClaimV1Destroy(s *terraform.State) er
 			continue
 		}
 
-		namespace, name, err := idParts(rs.Primary.ID)
+		namespace, name, err := IdParts(rs.Primary.ID)
 		if err != nil {
 			return err
 		}
 
-		var resp *api.PersistentVolumeClaim
-		err = resource.RetryContext(ctx, 3*time.Minute, func() *resource.RetryError {
+		var resp *corev1.PersistentVolumeClaim
+		err = retry.RetryContext(ctx, 3*time.Minute, func() *retry.RetryError {
 			resp, err = conn.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, name, metav1.GetOptions{})
 			if errors.IsNotFound(err) {
 				return nil
 			}
 			if err == nil && resp != nil {
-				return resource.RetryableError(err)
+				return retry.RetryableError(err)
 			}
-			return resource.NonRetryableError(err)
+			return retry.NonRetryableError(err)
 		})
-
 		if err != nil {
 			if resp.Namespace == namespace && resp.Name == name {
 				return fmt.Errorf("Persistent Volume still exists: %s", rs.Primary.ID)
@@ -551,7 +591,7 @@ func testAccCheckKubernetesPersistentVolumeClaimV1Destroy(s *terraform.State) er
 	return nil
 }
 
-func testAccCheckKubernetesPersistentVolumeClaimV1Exists(n string, obj *api.PersistentVolumeClaim) resource.TestCheckFunc {
+func testAccCheckKubernetesPersistentVolumeClaimV1Exists(n string, obj *corev1.PersistentVolumeClaim) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		rs, ok := s.RootModule().Resources[n]
 		if !ok {
@@ -563,7 +603,7 @@ func testAccCheckKubernetesPersistentVolumeClaimV1Exists(n string, obj *api.Pers
 			return err
 		}
 		ctx := context.TODO()
-		namespace, name, err := idParts(rs.Primary.ID)
+		namespace, name, err := IdParts(rs.Primary.ID)
 		if err != nil {
 			return err
 		}
@@ -578,7 +618,7 @@ func testAccCheckKubernetesPersistentVolumeClaimV1Exists(n string, obj *api.Pers
 	}
 }
 
-func testAccCheckKubernetesPersistentVolumeClaimV1IsDestroyed(obj *api.PersistentVolumeClaim) resource.TestCheckFunc {
+func testAccCheckKubernetesPersistentVolumeClaimV1IsDestroyed(obj *corev1.PersistentVolumeClaim) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		meta := obj.GetObjectMeta()
 		conn, err := testAccProvider.Meta().(KubeClientsets).MainClientset()
@@ -598,7 +638,7 @@ func testAccCheckKubernetesPersistentVolumeClaimV1IsDestroyed(obj *api.Persisten
 	}
 }
 
-func testAccCheckClaimRef(pv *api.PersistentVolume, expected *ObjectRefStatic) resource.TestCheckFunc {
+func testAccCheckClaimRef(pv *corev1.PersistentVolume, expected *ObjectRefStatic) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		or := pv.Spec.ClaimRef
 		if or == nil {
@@ -1133,7 +1173,48 @@ resource "kubernetes_persistent_volume_claim_v1" "test" {
 `, className, className, claimName)
 }
 
-func testAccCheckKubernetesPersistentVolumeClaimV1ForceNew(old, new *api.PersistentVolumeClaim, wantNew bool) resource.TestCheckFunc {
+func testAccKubernetesPersistentVolumeClaimV1Config_volumeModeDefault(name string) string {
+	return fmt.Sprintf(`resource "kubernetes_persistent_volume_claim_v1" "test" {
+  metadata {
+    name = %q
+  }
+
+  spec {
+    access_modes = ["ReadWriteOnce"]
+    resources {
+      requests = {
+        storage = "1Gi"
+      }
+    }
+  }
+
+  wait_until_bound = false
+}
+`, name)
+}
+
+func testAccKubernetesPersistentVolumeClaimV1Config_volumeMode(name, volumeMode string) string {
+	return fmt.Sprintf(`resource "kubernetes_persistent_volume_claim_v1" "test" {
+  metadata {
+    name = %q
+  }
+
+  spec {
+    access_modes = ["ReadWriteOnce"]
+    volume_mode  = %q
+    resources {
+      requests = {
+        storage = "1Gi"
+      }
+    }
+  }
+
+  wait_until_bound = false
+}
+`, name, volumeMode)
+}
+
+func testAccCheckKubernetesPersistentVolumeClaimV1ForceNew(old, new *corev1.PersistentVolumeClaim, wantNew bool) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		if wantNew {
 			if old.ObjectMeta.UID == new.ObjectMeta.UID {

@@ -1,3 +1,335 @@
+## 3.3.0 (Oct 1,2026)
+
+BREAKING CHANGES:
+
+* `resource/kubernetes_namespace_v1`: Validate that `metadata.labels` and `metadata.annotations` entries contain non-null strings. Previously accepted null entries are now rejected during planning; omit those entries or provide string values. Entire maps may still be omitted or set to `null`. [[GH-2979](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2979)]
+
+BUG FIXES:
+
+* `data-source/kubernetes_namespace_v1`: Report a missing `metadata.name` during validation instead of failing during the namespace lookup. [[GH-2960](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2960)]
+* `resource/kubernetes_stateful_set_v1`: Fix `Missing Resource Identity After Update` error when `wait_for_rollout` is `true` and the StatefulSet is updated in place [[GH-2967](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2967)]
+* provider: Bump `google.golang.org/grpc` to v1.82.1 and `golang.org/x/crypto` to v0.52.0 to resolve upstream security advisories. [[GH-2959](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2959)]
+
+NOTES:
+
+* `data-source/kubernetes_all_namespaces`: Migrated from SDKv2 to the Plugin Framework. [[GH-2962](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2962)]
+* `data-source/kubernetes_namespace_v1`: Migrated from SDKv2 to the Plugin Framework. [[GH-2960](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2960)]
+* `resource/kubernetes_namespace_v1`: Migrated from terraform-plugin-sdk/v2 to terraform-plugin-framework, retaining the existing resource name and configuration block syntax. `moved` blocks from the deprecated `kubernetes_namespace` resource are supported. Explicitly empty metadata maps may produce a one-time in-place update after upgrading. [[GH-2979](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2979)]
+
+## 3.2.1 (Jun 30, 2026)
+
+BUG FIXES:
+
+* `resource/*`: Fix `Unexpected Identity Change` error after apply when a resource takes a long time to become ready; bump `terraform-plugin-sdk` to v2.38.2 [[GH-2859](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2859)]
+* `resource/kubernetes_secret_v1`: Fix `Missing Resource Identity After Create` error when using `data_wo` or `binary_data_wo` write-only attributes [[GH-2859](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2859)]
+
+## 3.2.0 (Jun 4, 2026)
+
+ENHANCEMENTS:
+
+* Added linux/s390x build target for IBM Z platform [[GH-2897](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2897)]
+
+NOTES:
+
+* Upgrade Go to 1.26.3 [[GH-2896](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2896)]
+
+## 3.1.0 (Apr 15, 2026)
+
+FEATURES:
+
+* kubernetes: Add `kubernetes_endpoint_slice_v1` data source [[GH-2847](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2847)]
+
+## 3.0.1 (Dec 5, 2025)
+
+HOTFIX:
+
+* Fix missing `ip_mode` attribute in `kubernetes_service_v1` data source. [[GH-2807](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2807)]
+ 
+
+## 3.0.0 (Dec 3, 2025)
+
+ENHANCEMENTS:
+
+* * Add support for sidecar containers via restart_policy field in init_container spec [[GH-2786](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2786)]
+* Add `ip_mode` attribute to service status [[GH-2784](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2784)]
+* Add support for ValidatingAdmissionPolicy [[GH-2794](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2794)]
+* Bump Kubernetes dependencies to v1.33 [[GH-2774](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2774)]
+
+DEPRECATIONS:
+
+* **Data Sources**
+- `kubernetes_config_map` → use `kubernetes_config_map_v1`
+- `kubernetes_namespace` → use `kubernetes_namespace_v1`
+- `kubernetes_secret` → use `kubernetes_secret_v1`
+- `kubernetes_service` → use `kubernetes_service_v1`
+- `kubernetes_pod` → use `kubernetes_pod_v1`
+- `kubernetes_service_account` → use `kubernetes_service_account_v1`
+- `kubernetes_persistent_volume_claim` → use `kubernetes_persistent_volume_claim_v1`
+- `kubernetes_storage_class` → use `kubernetes_storage_class_v1`
+- `kubernetes_ingress` → use `kubernetes_ingress_v1`
+
+**Resources**
+- `kubernetes_namespace` → use `kubernetes_namespace_v1`
+- `kubernetes_service` → use `kubernetes_service_v1`
+- `kubernetes_service_account` → use `kubernetes_service_account_v1`
+- `kubernetes_default_service_account` → use `kubernetes_default_service_account_v1`
+- `kubernetes_config_map` → use `kubernetes_config_map_v1`
+- `kubernetes_secret` → use `kubernetes_secret_v1`
+- `kubernetes_pod` → use `kubernetes_pod_v1`
+- `kubernetes_endpoints` → use `kubernetes_endpoints_v1`
+- `kubernetes_limit_range` → use `kubernetes_limit_range_v1`
+- `kubernetes_persistent_volume` → use `kubernetes_persistent_volume_v1`
+- `kubernetes_persistent_volume_claim` → use `kubernetes_persistent_volume_claim_v1`
+- `kubernetes_replication_controller` → use `kubernetes_replication_controller_v1`
+- `kubernetes_resource_quota` → use `kubernetes_resource_quota_v1`
+- `kubernetes_api_service` → use `kubernetes_api_service_v1`
+- `kubernetes_deployment` → use `kubernetes_deployment_v1`
+- `kubernetes_daemonset` → use `kubernetes_daemon_set_v1`
+- `kubernetes_stateful_set` → use `kubernetes_stateful_set_v1`
+- `kubernetes_job` → use `kubernetes_job_v1`
+- `kubernetes_cron_job` → use `kubernetes_cron_job_v1`
+- `kubernetes_horizontal_pod_autoscaler` → use `kubernetes_horizontal_pod_autoscaler_v1` or `kubernetes_horizontal_pod_autoscaler_v2`
+- `kubernetes_certificate_signing_request` → use `kubernetes_certificate_signing_request_v1`
+- `kubernetes_role` → use `kubernetes_role_v1`
+- `kubernetes_role_binding` → use `kubernetes_role_binding_v1`
+- `kubernetes_cluster_role` → use `kubernetes_cluster_role_v1`
+- `kubernetes_cluster_role_binding` → use `kubernetes_cluster_role_binding_v1`
+- `kubernetes_ingress` → use `kubernetes_ingress_v1`
+- `kubernetes_ingress_class` → use `kubernetes_ingress_class_v1`
+- `kubernetes_network_policy` → use `kubernetes_network_policy_v1`
+- `kubernetes_pod_disruption_budget` → use `kubernetes_pod_disruption_budget_v1`
+- `kubernetes_pod_security_policy` → removed upstream; use Pod Security Admission instead
+- `kubernetes_priority_class` → use `kubernetes_priority_class_v1`
+- `kubernetes_validating_webhook_configuration` → use `kubernetes_validating_webhook_configuration_v1`
+- `kubernetes_mutating_webhook_configuration` → use `kubernetes_mutating_webhook_configuration_v1`
+- `kubernetes_storage_class` → use `kubernetes_storage_class_v1`
+- `kubernetes_csi_driver` → use `kubernetes_csi_driver_v1` [[GH-2770](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2770)]
+
+BUG FIXES:
+
+* Environment variables should not override configuration when using `kubernetes_manifest`. [[GH-2788](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2788)]
+* `resource/kubernetes_daemon_set_v1`: fix an issue with the provider not waiting for rollout with `wait_for_rollout = true`. [[GH-2789](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2789)]
+
+## 2.38.0 (Jul 21, 2025)
+
+ENHANCEMENTS:
+
+* Add ResourceIdentity support to kubernetes_manifest [[GH-2737](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2737)]
+* Add `sub_path_expr` to volume mount options pod spec [[GH-2622](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2622)]
+* Add support for ResourceIdentity to SDKv2 resources [[GH-2751](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2751)]
+
+BUG FIXES:
+
+* Fixed goroutine-safety in the CRD and metadata cache, resulting in far fewer provider metadata requests. [[GH-2699](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2699)]
+* `data_source/kubernetes_pod_v1`: fix an issue when the provider cuts out toleration under pod spec(`spec.toleration`) if it uses a well-known [taint](https://kubernetes.io/docs/reference/labels-annotations-taints/). [[GH-2380](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2380)]
+* `data_source/kubernetes_pod`: fix an issue when the provider cuts out toleration under pod spec(`spec.toleration`) if it uses a well-known [taint](https://kubernetes.io/docs/reference/labels-annotations-taints/). [[GH-2380](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2380)]
+* `resource/kubernetes_cron_job: fix an issue when the provider cuts out toleration under pod spec template(`*.template.spec.toleration`) if it uses a well-known [taint](https://kubernetes.io/docs/reference/labels-annotations-taints/). That could lead to a perpetual diff behavior. [[GH-2380](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2380)]
+* `resource/kubernetes_cron_job_v1: fix an issue when the provider cuts out toleration under pod spec template(`*.template.spec.toleration`) if it uses a well-known [taint](https://kubernetes.io/docs/reference/labels-annotations-taints/). That could lead to a perpetual diff behavior. [[GH-2380](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2380)]
+* `resource/kubernetes_daemon_set_v1: fix an issue when the provider cuts out toleration under pod spec template(`*.template.spec.toleration`) if it uses a well-known [taint](https://kubernetes.io/docs/reference/labels-annotations-taints/). That could lead to a perpetual diff behavior. [[GH-2380](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2380)]
+* `resource/kubernetes_daemonset: fix an issue when the provider cuts out toleration under pod spec template(`*.template.spec.toleration`) if it uses a well-known [taint](https://kubernetes.io/docs/reference/labels-annotations-taints/). That could lead to a perpetual diff behavior. [[GH-2380](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2380)]
+* `resource/kubernetes_deployment: fix an issue when the provider cuts out toleration under pod spec template(`*.template.spec.toleration`) if it uses a well-known [taint](https://kubernetes.io/docs/reference/labels-annotations-taints/). That could lead to a perpetual diff behavior. [[GH-2380](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2380)]
+* `resource/kubernetes_deployment_v1: fix an issue when the provider cuts out toleration under pod spec template(`*.template.spec.toleration`) if it uses a well-known [taint](https://kubernetes.io/docs/reference/labels-annotations-taints/). That could lead to a perpetual diff behavior. [[GH-2380](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2380)]
+* `resource/kubernetes_job: fix an issue when the provider cuts out toleration under pod spec template(`*.template.spec.toleration`) if it uses a well-known [taint](https://kubernetes.io/docs/reference/labels-annotations-taints/). That could lead to a perpetual diff behavior. [[GH-2380](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2380)]
+* `resource/kubernetes_job_v1: fix an issue when the provider cuts out toleration under pod spec template(`*.template.spec.toleration`) if it uses a well-known [taint](https://kubernetes.io/docs/reference/labels-annotations-taints/). That could lead to a perpetual diff behavior. [[GH-2380](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2380)]
+* `resource/kubernetes_replication_controller_v1`: fix an issue when the provider cuts out toleration under pod spec template(`*.template.spec.toleration`) if it uses a well-known [taint](https://kubernetes.io/docs/reference/labels-annotations-taints/). That could lead to a perpetual diff behavior. [[GH-2380](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2380)]
+* `resource/kubernetes_replication_controller`: fix an issue when the provider cuts out toleration under pod spec template(`*.template.spec.toleration`) if it uses a well-known [taint](https://kubernetes.io/docs/reference/labels-annotations-taints/). That could lead to a perpetual diff behavior. [[GH-2380](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2380)]
+* `resource/kubernetes_stateful_set: fix an issue when the provider cuts out toleration under pod spec template(`*.template.spec.toleration`) if it uses a well-known [taint](https://kubernetes.io/docs/reference/labels-annotations-taints/). That could lead to a perpetual diff behavior. [[GH-2380](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2380)]
+* `resource/kubernetes_stateful_set_v1: fix an issue when the provider cuts out toleration under pod spec template(`*.template.spec.toleration`) if it uses a well-known [taint](https://kubernetes.io/docs/reference/labels-annotations-taints/). That could lead to a perpetual diff behavior. [[GH-2380](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2380)]
+
+NOTES:
+
+* We have updated the logic of resources that use the Pod specification template, such as `kubernetes_deployment_v1`, `kubernetes_stateful_set_v1`, etc, and now the provider will keep all tolerations(`spec.toleration`) returned by Kubernetes. The same is applicable for the data sources `kubernetes_pod_v1` and `kubernetes_pod`. The behavior of resources `kubernetes_pod_v1` and `kubernetes_pod` remains unchanged, i.e. the provider will keep removing tolerations with well-known [taints](https://kubernetes.io/docs/reference/labels-annotations-taints/) since they might be attached to the object by Kubernetes controller and could lead to a perpetual diff. [[GH-2380](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2380)]
+
+## 2.37.1 (May 21, 2025)
+
+BUG FIXES:
+
+* Fixes issue #2732 where the provider would fail when used with Terraform >= v1.12.1 due to missing `GetResourceIdentitySchemas` implementation. [[GH-2732](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2732)]
+
+## 2.37.0 (May 20, 2025)
+
+ENHANCEMENTS:
+
+* `kubernetes_config_map_v1`: Add support for ResourceIdentity [[GH-2721](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2721)]
+
+
+## 2.36.0 (Feb 26, 2025)
+
+ENHANCEMENTS:
+
+* `resource/kubernetes_secret_v1`: Add support for write only attributes for `data_wo` and `binary_data_wo`. [[GH-2692](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2692)]
+
+## 2.35.1 (Dec 20, 2024)
+
+BUG FIXES:
+
+* `resource/kubernetes_job_v1`: revert the changes introduced in v2.34.0, where `ttl_seconds_after_finished` was set to `0`. [[GH-2650](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2650)]
+* `resource/kubernetes_daemon_set_v1`: fix issue where fields `spec.strategy.rolling_update.max_surge` and `spec.strategy.rolling_update.max_unavailable` were not being validated correctly. [[GH-2653](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2653)]
+
+## 2.35.0 (Dec 12, 2024)
+
+FEATURES:
+
+* `resources_kubernetes_daemon_set_v1` : Added `max_surge` argument for to `rolling_update` block. [[GH-2630](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2630)]
+
+## 2.34.0 (Nov 25, 2024)
+
+ENHANCEMENTS:
+
+* Added `conditions` attribute to `kubernetes_nodes` data source, which will provide detailed node health and status information [[GH-2612](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2612)]
+* Adding the `kubernetes_secret_v1_data` resource to the kubernetes provider. This resource will allow users to manage kubernetes secrets [[GH-2604](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2604)]
+* Properly handle Kubernetes Jobs with ttl_seconds_after_finished = 0 to prevent unnecessary recreation. [[GH-2596](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2596)]
+
+FEATURES:
+* New ephemeral resource: `kubernetes_certificate_signing_request_v1` [[GH-2628](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2628)] 
+* New ephemeral resource: `kubernetes_token_request_v1` [[GH-2628](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2628)]
+
+## 2.33.0 (Oct 10, 2024)
+
+ENHANCEMENTS:
+
+* Add `backoff_per_limit_index` and `max_failed_indexes` fields in `structure_job.go` [[GH-2421](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2421)]
+* Added support for `namespace_selector` field in `PodAffinityTerm` to enhance pod affinity and anti-affinity rules, allowing selection of namespaces based on label selectors. [[GH-2577](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2577)]
+* `kubernetes_manifest` - handling "404 Not Found" errors during the deletion of Kubernetes resources, particularly in cases where the resource may have already been deleted by an operator managing the CRD before Terraform attempts to delete it. [[GH-2592](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2592)]
+* `schema_container.go`: Add VolumeDevices [[GH-2573](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2573)]
+
+## 2.32.0 (Aug 14, 2024)
+
+FEATURES:
+
+* New data source: `kubernetes_server_version` [[GH-2306](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2306)]
+
+ENHANCEMENTS:
+
+* `resource/kubernetes_certificate_signing_request_v1`: Add argument `spec.expiration_seconds` [[GH-2559](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2559)]
+* `resource/kubernetes_persistent_volume_v1`: support `ReadWriteOncePod` access mode for PVs [[GH-2488](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2488)]
+
+## 2.30.0 (May 8, 2024)
+
+BUG FIXES:
+
+* `data_source/kubernetes_resources`: fix an issue where the provider exit with an error when the data source `kubernetes_resources` receives multiple Kubernetes objects containing tuples with different numbers of elements. [[GH-2372](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2372)]
+* `kubernetes_manifest`: fix issue preventing KUBE_PROXY_URL environment variable from being used in client configuration (#1733) [[GH-2485](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2485)]
+* `resource/kubernetes_node_taint`: Fix the error check for nonexistant nodes so that terraform does not fail if there is a taint in the state file for a node that has been deleted. [[GH-2402](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2402)]
+
+DOCS:
+
+* Migrate legacy structure to new tfplugindocs template structure [[GH-2470](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2470)]
+
+## 2.29.0 (April 11, 2024)
+
+BUG FIXES:
+
+* data-sources: revert a recently introduced deviation on datasources where querying a non-existent resource would cause an error (#2434). [[GH-2464](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2464)]
+
+## 2.28.1 (April 9, 2024)
+
+HOTFIX:
+
+* `manifest_decode()`: fix handling of manifests containing null values [[GH-2461](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2461)]
+
+## 2.28.0 (April 8, 2024)
+
+ENHANCEMENTS:
+
+**NOTE: Using [Provider Defined Functions](https://developer.hashicorp.com/terraform/plugin/framework/functions/concepts) requires Terraform version 1.8.0.**
+
+* Add provider defined functions: `manifest_encode`, `manifest_decode`, `manifest_decode_multi` [[GH-2428](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2428)]
+
+## 2.27.0 (Mar, 6 2024)
+
+ENHANCEMENTS:
+
+* `resource/kubernetes_pod_v1`: add missing `topology_spread_constraints`: `node_affinity_policy`, `node_taints_policy`, `match_label_keys`, `min_domains` [[GH-2429](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2429)]
+
+## 2.26.0 (Feb 15, 2024)
+
+ENHANCEMENTS:
+
+* `kubernetes/kubernetes_deployment_v1`: Add support for `HugePages` in `emptyDir.medium` [[GH-2395](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2395)]
+* `resource/kubernetes_job_v1`: add new attribute `spec.pod_failure_policy` to job spec [[GH-2394](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2394)]
+
+NOTES:
+
+* Bump Kubernetes dependencies from x.27.8 to x.28.6. [[GH-2404](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2404)]
+
+## 2.25.2 (Jan 8, 2024)
+
+BUG FIXES:
+
+* `resource/kubernetes_cron_job_v1`: fix an issue when the provider forces a resource recreation after upgrading to `2.25.0` and `2.25.1` due to changes in the resource schema. [[GH-2387](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2387)]
+* `resource/kubernetes_cron_job`: fix an issue when the provider forces a resource recreation after upgrading to `2.25.0` and `2.25.1` due to changes in the resource schema. [[GH-2387](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2387)]
+* `resource/kubernetes_daemon_set_v1`: fix an issue when the provider forces a resource recreation after upgrading to `2.25.0` and `2.25.1` due to changes in the resource schema. [[GH-2387](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2387)]
+* `resource/kubernetes_daemonset`: fix an issue when the provider forces a resource recreation after upgrading to `2.25.0` and `2.25.1` due to changes in the resource schema. [[GH-2387](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2387)]
+* `resource/kubernetes_stateful_set_v1`: fix an issue when the provider forces a resource recreation after upgrading to `2.25.0` and `2.25.1` due to changes in the resource schema. [[GH-2387](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2387)]
+* `resource/kubernetes_stateful_set`: fix an issue when the provider forces a resource recreation after upgrading to `2.25.0` and `2.25.1` due to changes in the resource schema. [[GH-2387](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2387)]
+
+NOTES:
+
+* Resources `kubernetes_cron_job_v1` and `kubernetes_cron_job` got a new attribute `spec.job_template.metadata.namespace`. It is a stub attribute that does not affect the namespace in which the Pod will be created. The Pod will be created in the same namespace as the main resource. However, modifying this field will force the resource recreation. [[GH-2387](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2387)]
+* Resources `kubernetes_stateful_set_v1`, `kubernetes_stateful_set`, `kubernetes_daemon_set_v1`, and `kubernetes_daemonset` got a new attribute `spec.template.metadata.namespace`. It is a stub attribute that does not affect the namespace in which the Pod will be created. The Pod will be created in the same namespace as the main resource. However, modifying this field will force the resource recreation. [[GH-2387](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2387)]
+
+## 2.25.1 (Jan 4, 2024)
+
+HOTFIX:
+
+* `kubernetes_manifest`: Implement response for GetMetadata protocol function [[GH-2384](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2384)]
+
+## 2.25.0 (Jan 4, 2024)
+
+ENHANCEMENTS:
+
+* Add terraform-plugin-framework provider [[GH-2347](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2347)]
+* `data_source/kubernetes_persistent_volume_claim_v1`: add a new attribute `spec.volume_mode`. [[GH-2353](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2353)]
+* `data_source/kubernetes_persistent_volume_claim`: add a new attribute `spec.volume_mode`. [[GH-2353](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2353)]
+* `kubernetes/schema_stateful_set_spec.go`: Add `spec.persistentVolumeClaimRetentionPolicy` in `kubernetes_stateful_set` [[GH-2333](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2333)]
+* `resource/kubernetes_persistent_volume_claim_v1`: add a new attribute `spec.volume_mode`. [[GH-2353](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2353)]
+* `resource/kubernetes_persistent_volume_claim`: add a new attribute `spec.volume_mode`. [[GH-2353](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2353)]
+* `resource/kubernetes_stateful_set_v1`: add a new attribute `spec.volume_claim_template.spec.volume_mode`. [[GH-2353](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2353)]
+* `resource/kubernetes_stateful_set`: add a new attribute `spec.volume_claim_template.spec.volume_mode`. [[GH-2353](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2353)]
+
+BUG FIXES:
+
+* `resource/kubernetes_cron_job_v1`: Change the schema to include a namespace in `jobTemplate`
+`resource/kubernetes_stateful_set_v1`: Change the schema to include a namespace in `template` [[GH-2362](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2362)]
+* `resource/kubernetes_ingress_v1`: Fix an issue where the empty `tls` attribute in the configuration does not generate the corresponding Ingress object without any TLS configuration. [[GH-2344](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2344)]
+* `resource/kubernetes_ingress`: Fix an issue where the empty `tls` attribute in the configuration does not generate the corresponding Ingress object without any TLS configuration. [[GH-2344](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2344)]
+
+NOTES:
+
+* We have updated the logic of data sources and now the provider will return all annotations and labels attached to the object, regardless of the `ignore_annotations` and `ignore_labels` provider settings. In addition to that, a list of ignored labels when they are attached to `kubernetes_job(_v1)` and `kubernetes_cron_job(_v1)` resources were extended with labels `batch.kubernetes.io/controller-uid` and `batch.kubernetes.io/job-name` since they aim to replace `controller-uid` and `job-name` in the future Kubernetes releases. [[GH-2345](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2345)]
+
+A special and warm welcome to the first contribution from our teammate @SarahFrench! 🚀
+
+## Community Contributors :raised_hands:
+
+- @tbobm made their contribution in https://github.com/hashicorp/terraform-provider-kubernetes/pull/2348
+- @andremarianiello made their contribution in https://github.com/hashicorp/terraform-provider-kubernetes/pull/2344
+- @adinhodovic made their contribution in https://github.com/hashicorp/terraform-provider-kubernetes/pull/2333
+- @wonko made their contribution in https://github.com/hashicorp/terraform-provider-kubernetes/pull/2362
+
+## 2.24.0 (Nov 27, 2023)
+
+ENHANCEMENTS:
+
+`kubernetes/schema_affinity_spec.go`: Add `match_fields` to nodeAffinity [[GH-2296](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2296)]
+`kubernetes/schema_pod_spec.go`: Add `os` to podSpecFields [[GH-2290](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2290)]
+`resource/kubernetes_config_map_v1_data`: improve error handling while validating the existence of the target ConfigMap. [[GH-2230](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2230)]
+
+BUG FIXES:
+
+* `resource/kubernetes_labels`: Add ["f:metadata"] check in kubernetes_labels to prevent crash with kubernetes_node_taints [[GH-2246](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2246)]
+
+DOCS:
+
+* Add example module for configuring OIDC authentication on EKS [[GH-2287](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2287)]
+* Add example module for configuring OIDC authentication on GKE [[GH-2319](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2319)]
+
+NOTES:
+
+* Bump Go version from 1.20 to 1.21. [[GH-2337](https://github.com/hashicorp/terraform-provider-kubernetes/issues/2337)]
+* Bump Kubernetes dependencies from x.25.11 to x.27.8.
+
 ## 2.23.0 (August 16, 2023)
 
 FEATURES:

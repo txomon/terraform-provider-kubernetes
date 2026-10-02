@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -8,22 +8,25 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/utils/ptr"
 )
 
 func TestFlattenTolerations(t *testing.T) {
 	cases := []struct {
-		Input          []v1.Toleration
+		Input          []corev1.Toleration
+		isTemplate     bool
 		ExpectedOutput []interface{}
 	}{
 		{
-			[]v1.Toleration{
+			[]corev1.Toleration{
 				{
 					Key:   "node-role.kubernetes.io/spot-worker",
 					Value: "true",
 				},
 			},
+			false,
 			[]interface{}{
 				map[string]interface{}{
 					"key":   "node-role.kubernetes.io/spot-worker",
@@ -32,7 +35,7 @@ func TestFlattenTolerations(t *testing.T) {
 			},
 		},
 		{
-			[]v1.Toleration{
+			[]corev1.Toleration{
 				{
 					Key:      "node-role.kubernetes.io/other-worker",
 					Operator: "Exists",
@@ -42,6 +45,7 @@ func TestFlattenTolerations(t *testing.T) {
 					Value: "true",
 				},
 			},
+			false,
 			[]interface{}{
 				map[string]interface{}{
 					"key":      "node-role.kubernetes.io/other-worker",
@@ -54,12 +58,13 @@ func TestFlattenTolerations(t *testing.T) {
 			},
 		},
 		{
-			[]v1.Toleration{
+			[]corev1.Toleration{
 				{
 					Effect:            "NoExecute",
-					TolerationSeconds: ptrToInt64(120),
+					TolerationSeconds: ptr.To(int64(120)),
 				},
 			},
+			false,
 			[]interface{}{
 				map[string]interface{}{
 					"effect":             "NoExecute",
@@ -68,13 +73,50 @@ func TestFlattenTolerations(t *testing.T) {
 			},
 		},
 		{
-			[]v1.Toleration{},
+			[]corev1.Toleration{
+				{
+					Effect:            "NoExecute",
+					Key:               "node.kubernetes.io/unreachable",
+					Operator:          "Exists",
+					TolerationSeconds: ptr.To(int64(120)),
+				},
+			},
+			false,
 			[]interface{}{},
+		},
+		{
+			[]corev1.Toleration{},
+			false,
+			[]interface{}{},
+		},
+		{
+			[]corev1.Toleration{},
+			true,
+			[]interface{}{},
+		},
+		{
+			[]corev1.Toleration{
+				{
+					Effect:            "NoExecute",
+					Key:               "node.kubernetes.io/unreachable",
+					Operator:          "Exists",
+					TolerationSeconds: ptr.To(int64(120)),
+				},
+			},
+			true,
+			[]interface{}{
+				map[string]interface{}{
+					"effect":             "NoExecute",
+					"key":                "node.kubernetes.io/unreachable",
+					"operator":           "Exists",
+					"toleration_seconds": "120",
+				},
+			},
 		},
 	}
 
 	for _, tc := range cases {
-		output := flattenTolerations(tc.Input)
+		output := flattenTolerations(tc.Input, tc.isTemplate)
 		if !reflect.DeepEqual(output, tc.ExpectedOutput) {
 			t.Fatalf("Unexpected output from flattener.\nExpected: %#v\nGiven:    %#v",
 				tc.ExpectedOutput, output)
@@ -85,7 +127,7 @@ func TestFlattenTolerations(t *testing.T) {
 func TestExpandTolerations(t *testing.T) {
 	cases := []struct {
 		Input          []interface{}
-		ExpectedOutput []*v1.Toleration
+		ExpectedOutput []*corev1.Toleration
 	}{
 		{
 			[]interface{}{
@@ -94,7 +136,7 @@ func TestExpandTolerations(t *testing.T) {
 					"value": "true",
 				},
 			},
-			[]*v1.Toleration{
+			[]*corev1.Toleration{
 				{
 					Key:   "node-role.kubernetes.io/spot-worker",
 					Value: "true",
@@ -112,7 +154,7 @@ func TestExpandTolerations(t *testing.T) {
 					"operator": "Exists",
 				},
 			},
-			[]*v1.Toleration{
+			[]*corev1.Toleration{
 				{
 					Key:   "node-role.kubernetes.io/spot-worker",
 					Value: "true",
@@ -130,16 +172,16 @@ func TestExpandTolerations(t *testing.T) {
 					"toleration_seconds": "120",
 				},
 			},
-			[]*v1.Toleration{
+			[]*corev1.Toleration{
 				{
 					Effect:            "NoExecute",
-					TolerationSeconds: ptrToInt64(120),
+					TolerationSeconds: ptr.To(int64(120)),
 				},
 			},
 		},
 		{
 			[]interface{}{},
-			[]*v1.Toleration{},
+			[]*corev1.Toleration{},
 		},
 	}
 
@@ -157,18 +199,18 @@ func TestExpandTolerations(t *testing.T) {
 
 func TestFlattenSecretVolumeSource(t *testing.T) {
 	cases := []struct {
-		Input          *v1.SecretVolumeSource
+		Input          *corev1.SecretVolumeSource
 		ExpectedOutput []interface{}
 	}{
 		{
-			&v1.SecretVolumeSource{
-				DefaultMode: ptrToInt32(0644),
+			&corev1.SecretVolumeSource{
+				DefaultMode: ptr.To(int32(0644)),
 				SecretName:  "secret1",
-				Optional:    ptrToBool(true),
-				Items: []v1.KeyToPath{
+				Optional:    ptr.To(true),
+				Items: []corev1.KeyToPath{
 					{
 						Key:  "foo.txt",
-						Mode: ptrToInt32(0600),
+						Mode: ptr.To(int32(0600)),
 						Path: "etc/foo.txt",
 					},
 				},
@@ -189,10 +231,10 @@ func TestFlattenSecretVolumeSource(t *testing.T) {
 			},
 		},
 		{
-			&v1.SecretVolumeSource{
-				DefaultMode: ptrToInt32(0755),
+			&corev1.SecretVolumeSource{
+				DefaultMode: ptr.To(int32(0755)),
 				SecretName:  "secret2",
-				Items: []v1.KeyToPath{
+				Items: []corev1.KeyToPath{
 					{
 						Key:  "bar.txt",
 						Path: "etc/bar.txt",
@@ -213,7 +255,7 @@ func TestFlattenSecretVolumeSource(t *testing.T) {
 			},
 		},
 		{
-			&v1.SecretVolumeSource{},
+			&corev1.SecretVolumeSource{},
 			[]interface{}{map[string]interface{}{}},
 		},
 	}
@@ -230,7 +272,7 @@ func TestFlattenSecretVolumeSource(t *testing.T) {
 func TestExpandSecretVolumeSource(t *testing.T) {
 	cases := []struct {
 		Input          []interface{}
-		ExpectedOutput *v1.SecretVolumeSource
+		ExpectedOutput *corev1.SecretVolumeSource
 	}{
 		{
 			[]interface{}{
@@ -247,14 +289,14 @@ func TestExpandSecretVolumeSource(t *testing.T) {
 					},
 				},
 			},
-			&v1.SecretVolumeSource{
-				DefaultMode: ptrToInt32(0644),
+			&corev1.SecretVolumeSource{
+				DefaultMode: ptr.To(int32(0644)),
 				SecretName:  "secret1",
-				Optional:    ptrToBool(true),
-				Items: []v1.KeyToPath{
+				Optional:    ptr.To(true),
+				Items: []corev1.KeyToPath{
 					{
 						Key:  "foo.txt",
-						Mode: ptrToInt32(0600),
+						Mode: ptr.To(int32(0600)),
 						Path: "etc/foo.txt",
 					},
 				},
@@ -273,10 +315,10 @@ func TestExpandSecretVolumeSource(t *testing.T) {
 					},
 				},
 			},
-			&v1.SecretVolumeSource{
-				DefaultMode: ptrToInt32(0755),
+			&corev1.SecretVolumeSource{
+				DefaultMode: ptr.To(int32(0755)),
 				SecretName:  "secret2",
-				Items: []v1.KeyToPath{
+				Items: []corev1.KeyToPath{
 					{
 						Key:  "bar.txt",
 						Path: "etc/bar.txt",
@@ -286,7 +328,7 @@ func TestExpandSecretVolumeSource(t *testing.T) {
 		},
 		{
 			[]interface{}{},
-			&v1.SecretVolumeSource{},
+			&corev1.SecretVolumeSource{},
 		},
 	}
 
@@ -306,12 +348,12 @@ func TestFlattenEmptyDirVolumeSource(t *testing.T) {
 	size, _ := resource.ParseQuantity("64Mi")
 
 	cases := []struct {
-		Input          *v1.EmptyDirVolumeSource
+		Input          *corev1.EmptyDirVolumeSource
 		ExpectedOutput []interface{}
 	}{
 		{
-			&v1.EmptyDirVolumeSource{
-				Medium: v1.StorageMediumMemory,
+			&corev1.EmptyDirVolumeSource{
+				Medium: corev1.StorageMediumMemory,
 			},
 			[]interface{}{
 				map[string]interface{}{
@@ -320,8 +362,8 @@ func TestFlattenEmptyDirVolumeSource(t *testing.T) {
 			},
 		},
 		{
-			&v1.EmptyDirVolumeSource{
-				Medium:    v1.StorageMediumMemory,
+			&corev1.EmptyDirVolumeSource{
+				Medium:    corev1.StorageMediumMemory,
 				SizeLimit: &size,
 			},
 			[]interface{}{
@@ -332,7 +374,7 @@ func TestFlattenEmptyDirVolumeSource(t *testing.T) {
 			},
 		},
 		{
-			&v1.EmptyDirVolumeSource{},
+			&corev1.EmptyDirVolumeSource{},
 			[]interface{}{
 				map[string]interface{}{
 					"medium": "",
@@ -352,20 +394,20 @@ func TestFlattenEmptyDirVolumeSource(t *testing.T) {
 
 func TestFlattenConfigMapVolumeSource(t *testing.T) {
 	cases := []struct {
-		Input          *v1.ConfigMapVolumeSource
+		Input          *corev1.ConfigMapVolumeSource
 		ExpectedOutput []interface{}
 	}{
 		{
-			&v1.ConfigMapVolumeSource{
-				LocalObjectReference: v1.LocalObjectReference{
+			&corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
 					Name: "configmap1",
 				},
-				DefaultMode: ptrToInt32(0644),
-				Optional:    ptrToBool(true),
-				Items: []v1.KeyToPath{
+				DefaultMode: ptr.To(int32(0644)),
+				Optional:    ptr.To(true),
+				Items: []corev1.KeyToPath{
 					{
 						Key:  "foo.txt",
-						Mode: ptrToInt32(0600),
+						Mode: ptr.To(int32(0600)),
 						Path: "etc/foo.txt",
 					},
 				},
@@ -386,12 +428,12 @@ func TestFlattenConfigMapVolumeSource(t *testing.T) {
 			},
 		},
 		{
-			&v1.ConfigMapVolumeSource{
-				LocalObjectReference: v1.LocalObjectReference{
+			&corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
 					Name: "configmap2",
 				},
-				DefaultMode: ptrToInt32(0755),
-				Items: []v1.KeyToPath{
+				DefaultMode: ptr.To(int32(0755)),
+				Items: []corev1.KeyToPath{
 					{
 						Key:  "bar.txt",
 						Path: "etc/bar.txt",
@@ -412,7 +454,7 @@ func TestFlattenConfigMapVolumeSource(t *testing.T) {
 			},
 		},
 		{
-			&v1.ConfigMapVolumeSource{},
+			&corev1.ConfigMapVolumeSource{},
 			[]interface{}{map[string]interface{}{"name": ""}},
 		},
 	}
@@ -429,7 +471,7 @@ func TestFlattenConfigMapVolumeSource(t *testing.T) {
 func TestExpandConfigMapVolumeSource(t *testing.T) {
 	cases := []struct {
 		Input          []interface{}
-		ExpectedOutput *v1.ConfigMapVolumeSource
+		ExpectedOutput *corev1.ConfigMapVolumeSource
 	}{
 		{
 			[]interface{}{
@@ -446,16 +488,16 @@ func TestExpandConfigMapVolumeSource(t *testing.T) {
 					},
 				},
 			},
-			&v1.ConfigMapVolumeSource{
-				LocalObjectReference: v1.LocalObjectReference{
+			&corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
 					Name: "configmap1",
 				},
-				DefaultMode: ptrToInt32(0644),
-				Optional:    ptrToBool(true),
-				Items: []v1.KeyToPath{
+				DefaultMode: ptr.To(int32(0644)),
+				Optional:    ptr.To(true),
+				Items: []corev1.KeyToPath{
 					{
 						Key:  "foo.txt",
-						Mode: ptrToInt32(0600),
+						Mode: ptr.To(int32(0600)),
 						Path: "etc/foo.txt",
 					},
 				},
@@ -474,12 +516,12 @@ func TestExpandConfigMapVolumeSource(t *testing.T) {
 					},
 				},
 			},
-			&v1.ConfigMapVolumeSource{
-				LocalObjectReference: v1.LocalObjectReference{
+			&corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
 					Name: "configmap2",
 				},
-				DefaultMode: ptrToInt32(0755),
-				Items: []v1.KeyToPath{
+				DefaultMode: ptr.To(int32(0755)),
+				Items: []corev1.KeyToPath{
 					{
 						Key:  "bar.txt",
 						Path: "etc/bar.txt",
@@ -489,7 +531,7 @@ func TestExpandConfigMapVolumeSource(t *testing.T) {
 		},
 		{
 			[]interface{}{},
-			&v1.ConfigMapVolumeSource{},
+			&corev1.ConfigMapVolumeSource{},
 		},
 	}
 
@@ -507,35 +549,35 @@ func TestExpandConfigMapVolumeSource(t *testing.T) {
 
 func TestExpandThenFlatten_projected_volume(t *testing.T) {
 	cases := []struct {
-		Input *v1.ProjectedVolumeSource
+		Input *corev1.ProjectedVolumeSource
 	}{
 		{
-			Input: &v1.ProjectedVolumeSource{
-				Sources: []v1.VolumeProjection{
+			Input: &corev1.ProjectedVolumeSource{
+				Sources: []corev1.VolumeProjection{
 					{
-						Secret: &v1.SecretProjection{
-							LocalObjectReference: v1.LocalObjectReference{Name: "secret-1"},
+						Secret: &corev1.SecretProjection{
+							LocalObjectReference: corev1.LocalObjectReference{Name: "secret-1"},
 						},
 					},
 					{
-						ConfigMap: &v1.ConfigMapProjection{
-							LocalObjectReference: v1.LocalObjectReference{Name: "config-1"},
+						ConfigMap: &corev1.ConfigMapProjection{
+							LocalObjectReference: corev1.LocalObjectReference{Name: "config-1"},
 						},
 					},
 					{
-						ConfigMap: &v1.ConfigMapProjection{
-							LocalObjectReference: v1.LocalObjectReference{Name: "config-2"},
+						ConfigMap: &corev1.ConfigMapProjection{
+							LocalObjectReference: corev1.LocalObjectReference{Name: "config-2"},
 						},
 					},
 					{
-						DownwardAPI: &v1.DownwardAPIProjection{
-							Items: []v1.DownwardAPIVolumeFile{
+						DownwardAPI: &corev1.DownwardAPIProjection{
+							Items: []corev1.DownwardAPIVolumeFile{
 								{Path: "path-1"},
 							},
 						},
 					},
 					{
-						ServiceAccountToken: &v1.ServiceAccountTokenProjection{
+						ServiceAccountToken: &corev1.ServiceAccountTokenProjection{
 							Audience: "audience-1",
 						},
 					},
@@ -565,7 +607,7 @@ func TestExpandThenFlatten_projected_volume(t *testing.T) {
 func TestExpandCSIVolumeSource(t *testing.T) {
 	cases := []struct {
 		Input          []interface{}
-		ExpectedOutput *v1.CSIVolumeSource
+		ExpectedOutput *corev1.CSIVolumeSource
 	}{
 		{
 			Input: []interface{}{
@@ -583,14 +625,14 @@ func TestExpandCSIVolumeSource(t *testing.T) {
 					},
 				},
 			},
-			ExpectedOutput: &v1.CSIVolumeSource{
+			ExpectedOutput: &corev1.CSIVolumeSource{
 				Driver:   "secrets-store.csi.k8s.io",
-				ReadOnly: ptrToBool(true),
-				FSType:   ptrToString("nfs"),
+				ReadOnly: ptr.To(true),
+				FSType:   ptr.To("nfs"),
 				VolumeAttributes: map[string]string{
 					"secretProviderClass": "azure-keyvault",
 				},
-				NodePublishSecretRef: &v1.LocalObjectReference{
+				NodePublishSecretRef: &corev1.LocalObjectReference{
 					Name: "secrets-store",
 				},
 			},
@@ -607,7 +649,7 @@ func TestExpandCSIVolumeSource(t *testing.T) {
 					},
 				},
 			},
-			ExpectedOutput: &v1.CSIVolumeSource{
+			ExpectedOutput: &corev1.CSIVolumeSource{
 				Driver:   "other-csi-driver.k8s.io",
 				ReadOnly: nil,
 				FSType:   nil,
@@ -632,18 +674,18 @@ func TestExpandCSIVolumeSource(t *testing.T) {
 
 func TestFlattenCSIVolumeSource(t *testing.T) {
 	cases := []struct {
-		Input          *v1.CSIVolumeSource
+		Input          *corev1.CSIVolumeSource
 		ExpectedOutput []interface{}
 	}{
 		{
-			Input: &v1.CSIVolumeSource{
+			Input: &corev1.CSIVolumeSource{
 				Driver:   "secrets-store.csi.k8s.io",
-				ReadOnly: ptrToBool(true),
-				FSType:   ptrToString("nfs"),
+				ReadOnly: ptr.To(true),
+				FSType:   ptr.To("nfs"),
 				VolumeAttributes: map[string]string{
 					"secretProviderClass": "azure-keyvault",
 				},
-				NodePublishSecretRef: &v1.LocalObjectReference{
+				NodePublishSecretRef: &corev1.LocalObjectReference{
 					Name: "secrets-store",
 				},
 			},
@@ -664,7 +706,7 @@ func TestFlattenCSIVolumeSource(t *testing.T) {
 			},
 		},
 		{
-			Input: &v1.CSIVolumeSource{
+			Input: &corev1.CSIVolumeSource{
 				Driver:   "other-csi-driver.k8s.io",
 				ReadOnly: nil,
 				FSType:   nil,

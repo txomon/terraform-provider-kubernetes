@@ -1,0 +1,26 @@
+name: Golang Linter
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+      - v3-major-release
+    paths:
+      - '**/*.go'
+      - '**/go.mod'
+
+jobs:
+  golang_linter:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
+      - name: Set up Go
+        uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+        with:
+          go-version-file: 'go.mod'
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@82606bf257cbaff209d206a39f5134f0cfbfd2ee # v9.2.1
+        with:
+          version: 'v2.12.2'

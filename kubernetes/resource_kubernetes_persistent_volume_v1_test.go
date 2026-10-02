@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	api "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,8 +27,6 @@ func TestAccKubernetesPersistentVolumeV1_minimal(t *testing.T) {
 	resourceName := "kubernetes_persistent_volume_v1.test"
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesPersistentVolumeV1Destroy,
 		Steps: []resource.TestStep{
@@ -54,7 +52,6 @@ func TestAccKubernetesPersistentVolumeV1_azure_basic(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t); skipIfNotRunningInAks(t) },
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		ExternalProviders: testAccExternalProviders,
 		CheckDestroy:      testAccCheckKubernetesPersistentVolumeV1Destroy,
@@ -120,7 +117,6 @@ func TestAccKubernetesPersistentVolumeV1_azure_blobStorageDisk(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t); skipIfNotRunningInAks(t) },
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		ExternalProviders: testAccExternalProviders,
 		CheckDestroy:      testAccCheckKubernetesPersistentVolumeV1Destroy,
@@ -177,7 +173,6 @@ func TestAccKubernetesPersistentVolumeV1_azure_file(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t); skipIfNotRunningInAks(t) },
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		ExternalProviders: testAccExternalProviders,
 		CheckDestroy:      testAccCheckKubernetesPersistentVolumeV1Destroy,
@@ -222,9 +217,8 @@ func TestAccKubernetesPersistentVolumeV1_googleCloud_basic(t *testing.T) {
 	zone := os.Getenv("GOOGLE_ZONE")
 
 	resource.ParallelTest(t, resource.TestCase{
-		PreCheck:          func() { testAccPreCheck(t); skipIfNotRunningInGke(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
+		PreCheck: func() { testAccPreCheck(t); skipIfNotRunningInGke(t) },
+
 		ProviderFactories: testAccProviderFactories,
 		ExternalProviders: testAccExternalProviders,
 		CheckDestroy:      testAccCheckKubernetesPersistentVolumeV1Destroy,
@@ -304,9 +298,8 @@ func TestAccKubernetesPersistentVolumeV1_aws_basic(t *testing.T) {
 	zone := region + "a"
 
 	resource.ParallelTest(t, resource.TestCase{
-		PreCheck:          func() { testAccPreCheck(t); skipIfNotRunningInEks(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
+		PreCheck: func() { testAccPreCheck(t); skipIfNotRunningInEks(t) },
+
 		ProviderFactories: testAccProviderFactories,
 		ExternalProviders: testAccExternalProviders,
 		CheckDestroy:      testAccCheckKubernetesPersistentVolumeV1Destroy,
@@ -381,9 +374,8 @@ func TestAccKubernetesPersistentVolumeV1_googleCloud_volumeSource(t *testing.T) 
 	resourceName := "kubernetes_persistent_volume_v1.test"
 
 	resource.ParallelTest(t, resource.TestCase{
-		PreCheck:          func() { testAccPreCheck(t); skipIfNotRunningInGke(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
+		PreCheck: func() { testAccPreCheck(t); skipIfNotRunningInGke(t) },
+
 		ProviderFactories: testAccProviderFactories,
 		ExternalProviders: testAccExternalProviders,
 		CheckDestroy:      testAccCheckKubernetesPersistentVolumeV1Destroy,
@@ -443,8 +435,6 @@ func TestAccKubernetesPersistentVolumeV1_hostPath_volumeSource(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesPersistentVolumeV1Destroy,
 		Steps: []resource.TestStep{
@@ -501,8 +491,6 @@ func TestAccKubernetesPersistentVolumeV1_local_volumeSource(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesPersistentVolumeV1Destroy,
 		Steps: []resource.TestStep{
@@ -552,8 +540,6 @@ func TestAccKubernetesPersistentVolumeV1_cephFsSecretRef(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesPersistentVolumeV1Destroy,
 		Steps: []resource.TestStep{
@@ -595,9 +581,8 @@ func TestAccKubernetesPersistentVolumeV1_storageClass(t *testing.T) {
 	resourceName := "kubernetes_persistent_volume_v1.test"
 
 	resource.ParallelTest(t, resource.TestCase{
-		PreCheck:          func() { testAccPreCheck(t); skipIfNotRunningInGke(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
+		PreCheck: func() { testAccPreCheck(t); skipIfNotRunningInGke(t) },
+
 		ProviderFactories: testAccProviderFactories,
 		ExternalProviders: testAccExternalProviders,
 		CheckDestroy:      testAccCheckKubernetesPersistentVolumeV1Destroy,
@@ -649,8 +634,6 @@ func TestAccKubernetesPersistentVolumeV1_hostPath_nodeAffinity(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesPersistentVolumeV1Destroy,
 		Steps: []resource.TestStep{
@@ -717,8 +700,6 @@ func TestAccKubernetesPersistentVolumeV1_hostPath_mountOptions(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesPersistentVolumeV1Destroy,
 		Steps: []resource.TestStep{
@@ -734,14 +715,39 @@ func TestAccKubernetesPersistentVolumeV1_hostPath_mountOptions(t *testing.T) {
 	})
 }
 
+func TestAccKubernetesPersistentVolumeV1_accessMode_ReadWriteOncePod(t *testing.T) {
+	var conf api.PersistentVolume
+	randString := acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
+	name := fmt.Sprintf("tf-acc-test-%s", randString)
+	resourceName := "kubernetes_persistent_volume_v1.test"
+
+	resource.ParallelTest(t, resource.TestCase{
+		PreCheck: func() {
+			testAccPreCheck(t)
+			skipIfClusterVersionLessThan(t, "1.27.0")
+		},
+
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckKubernetesPersistentVolumeV1Destroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccKubernetesPersistentVolumeV1Config_accessMode_ReadWriteOncePod(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckKubernetesPersistentVolumeV1Exists(resourceName, &conf),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.access_modes.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.access_modes.0", "ReadWriteOncePod"),
+				),
+			},
+		},
+	})
+}
+
 func TestAccKubernetesPersistentVolumeV1_csi_basic(t *testing.T) {
 	var conf api.PersistentVolume
 	name := acctest.RandomWithPrefix("tf-acc-test")
 	resourceName := "kubernetes_persistent_volume_v1.test"
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesPersistentVolumeV1Destroy,
 		Steps: []resource.TestStep{
@@ -813,8 +819,6 @@ func TestAccKubernetesPersistentVolumeV1_csi_secrets(t *testing.T) {
 	resourceName := "kubernetes_persistent_volume_v1.test"
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesPersistentVolumeV1Destroy,
 		Steps: []resource.TestStep{
@@ -862,8 +866,6 @@ func TestAccKubernetesPersistentVolumeV1_volumeMode(t *testing.T) {
 	resourceName := "kubernetes_persistent_volume_v1.test"
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesPersistentVolumeV1Destroy,
 		Steps: []resource.TestStep{
@@ -902,8 +904,6 @@ func TestAccKubernetesPersistentVolumeV1_hostpath_claimRef(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesPersistentVolumeV1Destroy,
 		Steps: []resource.TestStep{
@@ -956,7 +956,6 @@ func testAccCheckKubernetesPersistentVolumeV1ForceNew(old, new *api.PersistentVo
 
 func waitForPersistentVolumeDeleted(pvName string, poll, timeout time.Duration) error {
 	conn, err := testAccProvider.Meta().(KubeClientsets).MainClientset()
-
 	if err != nil {
 		return err
 	}
@@ -973,7 +972,6 @@ func waitForPersistentVolumeDeleted(pvName string, poll, timeout time.Duration) 
 
 func testAccCheckKubernetesPersistentVolumeV1Destroy(s *terraform.State) error {
 	conn, err := testAccProvider.Meta().(KubeClientsets).MainClientset()
-
 	if err != nil {
 		return err
 	}
@@ -1400,7 +1398,7 @@ func testAccKubernetesPersistentVolumeV1Config_azure_PersistentVolumeAzureFile(n
 }
 
 func testAccKubernetesPersistentVolumeV1Config_azure_PersistentVolumeAzureFileNamespace(name, namespace, secretName string) string {
-	return fmt.Sprintf(`resource "kubernetes_namespace_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_namespace" "test" {
   metadata {
     name = %[2]q
   }
@@ -1879,6 +1877,26 @@ func testAccKubernetesPersistentVolumeV1Config_hostPath_mountOptions(name string
 }`, name)
 }
 
+func testAccKubernetesPersistentVolumeV1Config_accessMode_ReadWriteOncePod(name string) string {
+	return fmt.Sprintf(`resource "kubernetes_persistent_volume_v1" "test" {
+  metadata {
+    name = "%s"
+  }
+  spec {
+    capacity = {
+      storage = "1Gi"
+    }
+    access_modes  = ["ReadWriteOncePod"]
+    mount_options = ["foo"]
+    persistent_volume_source {
+      host_path {
+        path = "/mnt/local-volume"
+      }
+    }
+  }
+}`, name)
+}
+
 func testAccKubernetesPersistentVolumeV1Config_hostPath_basic(name string) string {
 	return fmt.Sprintf(`resource "kubernetes_persistent_volume_v1" "test" {
   metadata {
@@ -1925,7 +1943,7 @@ func testAccKubernetesPersistentVolumeV1Config_hostPath_claimRef_noNamespace(nam
 }
 
 func testAccKubernetesPersistentVolumeV1Config_hostPath_claimRef_withNamespace(name string) string {
-	return fmt.Sprintf(`resource "kubernetes_namespace_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_namespace" "test" {
   metadata {
     name = %[1]q
   }
@@ -1942,7 +1960,7 @@ resource "kubernetes_persistent_volume_v1" "test" {
     mount_options = ["foo"]
     claim_ref {
       name      = %[1]q
-      namespace = kubernetes_namespace_v1.test.metadata.0.name
+      namespace = kubernetes_namespace.test.metadata.0.name
     }
 
     persistent_volume_source {
@@ -1955,7 +1973,7 @@ resource "kubernetes_persistent_volume_v1" "test" {
 }
 
 func testAccKubernetesPersistentVolumeV1Config_hostPath_claimRef_withPVC(name string) string {
-	return fmt.Sprintf(`resource "kubernetes_namespace_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_namespace" "test" {
   metadata {
     name = %[1]q
   }
@@ -1973,7 +1991,7 @@ resource "kubernetes_persistent_volume_v1" "test" {
     mount_options = ["foo"]
     claim_ref {
       name      = %[1]q
-      namespace = kubernetes_namespace_v1.test.metadata.0.name
+      namespace = kubernetes_namespace.test.metadata.0.name
     }
 
     persistent_volume_source {
@@ -1987,7 +2005,7 @@ resource "kubernetes_persistent_volume_v1" "test" {
 resource "kubernetes_persistent_volume_claim_v1" "test" {
   metadata {
     name      = %[1]q
-    namespace = kubernetes_namespace_v1.test.metadata.0.name
+    namespace = kubernetes_namespace.test.metadata.0.name
   }
 
   spec {

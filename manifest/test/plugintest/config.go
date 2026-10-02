@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package plugintest
@@ -6,7 +6,6 @@ package plugintest
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -39,7 +38,7 @@ func DiscoverConfig(ctx context.Context, sourceDir string) (*Config, error) {
 	tfPath := os.Getenv(EnvTfAccTerraformPath)
 
 	tempDir := os.Getenv(EnvTfAccTempDir)
-	tfDir, err := ioutil.TempDir(tempDir, "plugintest-terraform")
+	tfDir, err := os.MkdirTemp(tempDir, "plugintest-terraform")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp dir: %w", err)
 	}

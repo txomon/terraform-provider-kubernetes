@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -15,16 +15,18 @@ import (
 	pkgApi "k8s.io/apimachinery/pkg/types"
 )
 
-func resourceKubernetesClusterRoleV1() *schema.Resource {
+func resourceKubernetesClusterRoleV1(deprecationMessage string) *schema.Resource {
 	return &schema.Resource{
-		CreateContext: resourceKubernetesClusterRoleV1Create,
-		ReadContext:   resourceKubernetesClusterRoleV1Read,
-		UpdateContext: resourceKubernetesClusterRoleV1Update,
-		DeleteContext: resourceKubernetesClusterRoleV1Delete,
+		Description:        "A ClusterRole creates a role at the cluster level and in all namespaces.",
+		CreateContext:      resourceKubernetesClusterRoleV1Create,
+		ReadContext:        resourceKubernetesClusterRoleV1Read,
+		DeprecationMessage: deprecationMessage,
+		UpdateContext:      resourceKubernetesClusterRoleV1Update,
+		DeleteContext:      resourceKubernetesClusterRoleV1Delete,
 		Importer: &schema.ResourceImporter{
-			StateContext: schema.ImportStatePassthroughContext,
+			StateContext: resourceIdentityImportNonNamespaced,
 		},
-
+		Identity: resourceIdentitySchemaNonNamespaced(),
 		Schema: map[string]*schema.Schema{
 			"metadata": metadataSchemaRBAC("clusterRole", true, false),
 			"rule": {
@@ -157,6 +159,10 @@ func resourceKubernetesClusterRoleV1Read(ctx context.Context, d *schema.Resource
 		if err != nil {
 			return diag.FromErr(err)
 		}
+	}
+	err = setResourceIdentityNonNamespaced(d, "rbac.authorization.k8s.io/v1", "ClusterRole", name)
+	if err != nil {
+		return diag.FromErr(err)
 	}
 	return nil
 }

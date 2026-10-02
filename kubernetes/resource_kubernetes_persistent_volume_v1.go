@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -13,7 +13,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 	api "k8s.io/api/core/v1"
@@ -27,12 +27,14 @@ const (
 	persistentVolumeAzureBlobError    = `Unable to apply Azure Disk configuration. Blob storage disks require configuration: kind = "Shared" or kind = "Dedicated"`
 )
 
-func resourceKubernetesPersistentVolumeV1() *schema.Resource {
+func resourceKubernetesPersistentVolumeV1(deprecationMessage string) *schema.Resource {
 	return &schema.Resource{
-		CreateContext: resourceKubernetesPersistentVolumeV1Create,
-		ReadContext:   resourceKubernetesPersistentVolumeV1Read,
-		UpdateContext: resourceKubernetesPersistentVolumeV1Update,
-		DeleteContext: resourceKubernetesPersistentVolumeV1Delete,
+		Description:        "The resource provides a piece of networked storage in the cluster provisioned by an administrator. It is a resource in the cluster just like a node is a cluster resource. Persistent Volumes have a lifecycle independent of any individual pod that uses the PV. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/.",
+		CreateContext:      resourceKubernetesPersistentVolumeV1Create,
+		ReadContext:        resourceKubernetesPersistentVolumeV1Read,
+		DeprecationMessage: deprecationMessage,
+		UpdateContext:      resourceKubernetesPersistentVolumeV1Update,
+		DeleteContext:      resourceKubernetesPersistentVolumeV1Delete,
 		Importer: &schema.ResourceImporter{
 			StateContext: schema.ImportStatePassthroughContext,
 		},
@@ -94,6 +96,7 @@ func resourceKubernetesPersistentVolumeV1() *schema.Resource {
 									"ReadWriteOnce",
 									"ReadOnlyMany",
 									"ReadWriteMany",
+									"ReadWriteOncePod",
 								}, false),
 							},
 							Set: schema.HashString,
@@ -228,7 +231,7 @@ func resourceKubernetesPersistentVolumeV1Create(ctx context.Context, d *schema.R
 	}
 	log.Printf("[INFO] Submitted new persistent volume: %#v", out)
 
-	stateConf := &resource.StateChangeConf{
+	stateConf := &retry.StateChangeConf{
 		Target:  []string{"Available", "Bound"},
 		Pending: []string{"Pending"},
 		Timeout: d.Timeout(schema.TimeoutCreate),
@@ -240,7 +243,15 @@ func resourceKubernetesPersistentVolumeV1Create(ctx context.Context, d *schema.R
 			}
 
 			statusPhase := fmt.Sprintf("%v", out.Status.Phase)
-			log.Printf("[DEBUG] Persistent volume %s status received: %#v", out.Name, statusPhase)
+			statusMessage := fmt.Sprintf("%v", out.Status.Message)
+			if statusMessage == "" {
+				log.Printf("[DEBUG] Persistent volume %s status received: %#v", out.Name, statusPhase)
+			} else {
+				log.Printf("[DEBUG] Persistent volume %s status received: %#v, message received: %#v", out.Name, statusPhase, statusMessage)
+			}
+			if out.Status.LastPhaseTransitionTime != nil {
+				log.Printf("[DEBUG] Persistent volume last phrase transition time: %v", out.Status.LastPhaseTransitionTime)
+			}
 			return out, statusPhase, nil
 		},
 	}
@@ -277,6 +288,9 @@ func resourceKubernetesPersistentVolumeV1Read(ctx context.Context, d *schema.Res
 		return diag.FromErr(err)
 	}
 	log.Printf("[INFO] Received persistent volume: %#v", volume)
+	if volume.Status.LastPhaseTransitionTime != nil {
+		log.Printf("[DEBUG] Persistent volume last phrase transition time: %v", volume.Status.LastPhaseTransitionTime)
+	}
 	err = d.Set("metadata", flattenMetadata(volume.ObjectMeta, d, meta))
 	if err != nil {
 		return diag.FromErr(err)
@@ -335,18 +349,25 @@ func resourceKubernetesPersistentVolumeV1Delete(ctx context.Context, d *schema.R
 		return diag.FromErr(err)
 	}
 
-	err = resource.RetryContext(ctx, d.Timeout(schema.TimeoutDelete), func() *resource.RetryError {
+	err = retry.RetryContext(ctx, d.Timeout(schema.TimeoutDelete), func() *retry.RetryError {
 		out, err := conn.CoreV1().PersistentVolumes().Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
 				return nil
 			}
-			return resource.NonRetryableError(err)
+			return retry.NonRetryableError(err)
 		}
-
-		log.Printf("[DEBUG] Current state of persistent volume: %#v", out.Status.Phase)
+		statusMessage := fmt.Sprintf("%v", out.Status.Message)
+		if statusMessage == "" {
+			log.Printf("[DEBUG] Current state of persistent volume: %#v", out.Status.Phase)
+		} else {
+			log.Printf("[DEBUG] Current state of persistent volume: %#v, message received: %#v", out.Status.Phase, out.Status.Message)
+		}
+		if out.Status.LastPhaseTransitionTime != nil {
+			log.Printf("[DEBUG] Persistent volume last phrase transition time: %v", out.Status.LastPhaseTransitionTime)
+		}
 		e := fmt.Errorf("Persistent volume %s still exists (%s)", name, out.Status.Phase)
-		return resource.RetryableError(e)
+		return retry.RetryableError(e)
 	})
 	if err != nil {
 		return diag.FromErr(err)
@@ -366,12 +387,15 @@ func resourceKubernetesPersistentVolumeV1Exists(ctx context.Context, d *schema.R
 
 	name := d.Id()
 	log.Printf("[INFO] Checking persistent volume %s", name)
-	_, err = conn.CoreV1().PersistentVolumes().Get(ctx, name, metav1.GetOptions{})
+	out, err := conn.CoreV1().PersistentVolumes().Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
 			return false, nil
 		}
 		log.Printf("[DEBUG] Received error: %#v", err)
+	}
+	if out.Status.LastPhaseTransitionTime != nil {
+		log.Printf("[DEBUG] Persistent volume last phrase transition time: %v", out.Status.LastPhaseTransitionTime)
 	}
 	return true, err
 }

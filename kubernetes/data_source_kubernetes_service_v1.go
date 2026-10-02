@@ -1,21 +1,26 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
 
 import (
 	"context"
+	"log"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 	corev1 "k8s.io/api/core/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func dataSourceKubernetesServiceV1() *schema.Resource {
+func dataSourceKubernetesServiceV1(deprecationMessage string) *schema.Resource {
 	return &schema.Resource{
-		ReadContext: dataSourceKubernetesServiceV1Read,
+		Description:        "A Service is an abstraction which defines a logical set of pods and a policy by which to access them - sometimes called a micro-service. This data source allows you to pull data about such service.",
+		ReadContext:        dataSourceKubernetesServiceV1Read,
+		DeprecationMessage: deprecationMessage,
+
 		Schema: map[string]*schema.Schema{
 			"metadata": namespacedMetadataSchema("service", false),
 			"spec": {
@@ -222,6 +227,10 @@ func dataSourceKubernetesServiceV1() *schema.Resource {
 													Type:     schema.TypeString,
 													Computed: true,
 												},
+												"ip_mode": {
+													Type:     schema.TypeString,
+													Computed: true,
+												},
 												"hostname": {
 													Type:     schema.TypeString,
 													Computed: true,
@@ -240,11 +249,48 @@ func dataSourceKubernetesServiceV1() *schema.Resource {
 }
 
 func dataSourceKubernetesServiceV1Read(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
-	om := meta_v1.ObjectMeta{
-		Namespace: d.Get("metadata.0.namespace").(string),
-		Name:      d.Get("metadata.0.name").(string),
+	conn, err := meta.(KubeClientsets).MainClientset()
+	if err != nil {
+		return diag.FromErr(err)
 	}
-	d.SetId(buildId(om))
 
-	return resourceKubernetesServiceV1Read(ctx, d, meta)
+	metadata := expandMetadata(d.Get("metadata").([]interface{}))
+
+	om := metav1.ObjectMeta{
+		Namespace: metadata.Namespace,
+		Name:      metadata.Name,
+	}
+	d.SetId(BuildId(om))
+
+	log.Printf("[INFO] Reading service %s", metadata.Name)
+	svc, err := conn.CoreV1().Services(metadata.Namespace).Get(ctx, metadata.Name, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		log.Printf("[DEBUG] Received error: %#v", err)
+		return diag.FromErr(err)
+	}
+	log.Printf("[INFO] Received service: %#v", svc)
+
+	err = d.Set("metadata", flattenMetadataFields(svc.ObjectMeta))
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	err = d.Set("status", []interface{}{
+		map[string][]interface{}{
+			"load_balancer": flattenLoadBalancerStatus(svc.Status.LoadBalancer),
+		},
+	})
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	err = d.Set("spec", flattenServiceSpec(svc.Spec))
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	return nil
 }

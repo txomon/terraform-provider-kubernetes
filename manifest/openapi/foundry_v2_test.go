@@ -1,11 +1,11 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package openapi
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -166,7 +166,7 @@ func TestGetType(t *testing.T) {
 func buildFixtureFoundry() (Foundry, error) {
 	sfile := filepath.Join("testdata", "k8s-swagger.json")
 
-	input, err := ioutil.ReadFile(sfile)
+	input, err := os.ReadFile(sfile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load definition file: %s : %s", sfile, err)
 	}

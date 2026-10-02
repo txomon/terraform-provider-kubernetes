@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -110,14 +110,48 @@ func nodeStatusFields() map[string]*schema.Schema {
 						Computed: true,
 					},
 					"kube_proxy_version": {
-						Type:     schema.TypeString,
-						Computed: true,
+						Type:       schema.TypeString,
+						Computed:   true,
+						Deprecated: "This field has been deprecated in Kubernetes v1.31 and will be removed.",
 					},
 					"operating_system": {
 						Type:     schema.TypeString,
 						Computed: true,
 					},
 					"architecture": {
+						Type:     schema.TypeString,
+						Computed: true,
+					},
+				},
+			},
+		},
+		"conditions": {
+			Type:        schema.TypeList,
+			Computed:    true,
+			Description: "List of conditions describing each node's health and operational status.",
+			Elem: &schema.Resource{
+				Schema: map[string]*schema.Schema{
+					"type": {
+						Type:     schema.TypeString,
+						Computed: true,
+					},
+					"status": {
+						Type:     schema.TypeString,
+						Computed: true,
+					},
+					"last_heartbeat_time": {
+						Type:     schema.TypeString,
+						Computed: true,
+					},
+					"last_transition_time": {
+						Type:     schema.TypeString,
+						Computed: true,
+					},
+					"reason": {
+						Type:     schema.TypeString,
+						Computed: true,
+					},
+					"message": {
 						Type:     schema.TypeString,
 						Computed: true,
 					},

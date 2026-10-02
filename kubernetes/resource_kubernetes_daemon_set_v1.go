@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 
@@ -22,15 +22,18 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func resourceKubernetesDaemonSetV1() *schema.Resource {
+func resourceKubernetesDaemonSetV1(deprecationMessage string) *schema.Resource {
 	return &schema.Resource{
-		CreateContext: resourceKubernetesDaemonSetV1Create,
-		ReadContext:   resourceKubernetesDaemonSetV1Read,
-		UpdateContext: resourceKubernetesDaemonSetV1Update,
-		DeleteContext: resourceKubernetesDaemonSetV1Delete,
+		Description:        "A DaemonSet ensures that all (or some) Nodes run a copy of a Pod. As nodes are added to the cluster, Pods are added to them. As nodes are removed from the cluster, those Pods are garbage collected. Deleting a DaemonSet will clean up the Pods it created.",
+		CreateContext:      resourceKubernetesDaemonSetV1Create,
+		ReadContext:        resourceKubernetesDaemonSetV1Read,
+		DeprecationMessage: deprecationMessage,
+		UpdateContext:      resourceKubernetesDaemonSetV1Update,
+		DeleteContext:      resourceKubernetesDaemonSetV1Delete,
 		Importer: &schema.ResourceImporter{
-			StateContext: schema.ImportStatePassthroughContext,
+			StateContext: resourceIdentityImportNamespaced,
 		},
+		Identity: resourceIdentitySchemaNamespaced(),
 		StateUpgraders: []schema.StateUpgrader{
 			{
 				Version: 0,
@@ -103,12 +106,19 @@ func resourceKubernetesDaemonSetSchemaV1() map[string]*schema.Schema {
 									MaxItems:    1,
 									Elem: &schema.Resource{
 										Schema: map[string]*schema.Schema{
+											"max_surge": {
+												Type:         schema.TypeString,
+												Description:  "The maximum number of nodes with an existing available DaemonSet pod that can have an updated DaemonSet pod during during an update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up to a minimum of 1. Default value is 0. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have their a new pod created before the old pod is marked as deleted. The update starts by launching new pods on 30% of nodes. Once an updated pod is available (Ready for at least minReadySeconds) the old DaemonSet pod on that node is marked deleted. If the old pod becomes unavailable for any reason Ready transitions to false, is evicted, or is drained) an updated pod is immediatedly created on that node without considering surge limits. Allowing surge implies the possibility that the resources consumed by the daemonset on any given node can double if the readiness check fails, and so resource intensive daemonsets should take into account that they may cause evictionsduring disruption.",
+												Optional:     true,
+												Default:      0,
+												ValidateFunc: validation.StringMatch(regexp.MustCompile(`^(0|[1-9][0-9]*|[1-9][0-9]?%|100%)$`), ""),
+											},
 											"max_unavailable": {
 												Type:         schema.TypeString,
-												Description:  "The maximum number of DaemonSet pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of total number of DaemonSet pods at the start of the update (ex: 10%). Absolute number is calculated from percentage by rounding up. This cannot be 0. Default value is 1. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have their pods stopped for an update at any given time. The update starts by stopping at most 30% of those DaemonSet pods and then brings up new DaemonSet pods in their place. Once the new pods are available, it then proceeds onto other DaemonSet pods, thus ensuring that at least 70% of original number of DaemonSet pods are available at all times during the update.",
+												Description:  "The maximum number of DaemonSet pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of total number of DaemonSet pods at the start of the update (ex: 10%). Absolute number is calculated from percentage by rounding up. This cannot be 0 if MaxSurge is 0 Default value is 1. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have their pods stopped for an update at any given time. The update starts by stopping at most 30% of those DaemonSet pods and then brings up new DaemonSet pods in their place. Once the new pods are available, it then proceeds onto other DaemonSet pods, thus ensuring that at least 70% of original number of DaemonSet pods are available at all times during the update.",
 												Optional:     true,
 												Default:      1,
-												ValidateFunc: validation.StringMatch(regexp.MustCompile(`^([1-9][0-9]*|[1-9][0-9]%|[1-9]%|100%)$`), ""),
+												ValidateFunc: validation.StringMatch(regexp.MustCompile(`^(0|[1-9][0-9]*|[1-9][0-9]?%|100%)$`), ""),
 											},
 										},
 									},
@@ -162,14 +172,14 @@ func resourceKubernetesDaemonSetV1Create(ctx context.Context, d *schema.Resource
 	}
 
 	if d.Get("wait_for_rollout").(bool) {
-		err = resource.RetryContext(ctx, d.Timeout(schema.TimeoutCreate),
-			waitForDaemonSetReplicasFunc(ctx, conn, metadata.Namespace, metadata.Name))
+		err = retry.RetryContext(ctx, d.Timeout(schema.TimeoutCreate),
+			waitForDaemonSetPodsFunc(ctx, conn, metadata.Namespace, metadata.Name))
 		if err != nil {
 			return diag.FromErr(err)
 		}
 	}
 
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 
 	log.Printf("[INFO] Submitted new daemonset: %#v", out)
 
@@ -182,7 +192,7 @@ func resourceKubernetesDaemonSetV1Update(ctx context.Context, d *schema.Resource
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -213,8 +223,8 @@ func resourceKubernetesDaemonSetV1Update(ctx context.Context, d *schema.Resource
 	log.Printf("[INFO] Submitted updated daemonset: %#v", out)
 
 	if d.Get("wait_for_rollout").(bool) {
-		err = resource.RetryContext(ctx, d.Timeout(schema.TimeoutUpdate),
-			waitForDaemonSetReplicasFunc(ctx, conn, namespace, name))
+		err = retry.RetryContext(ctx, d.Timeout(schema.TimeoutUpdate),
+			waitForDaemonSetPodsFunc(ctx, conn, namespace, name))
 		if err != nil {
 			return diag.FromErr(err)
 		}
@@ -237,7 +247,7 @@ func resourceKubernetesDaemonSetV1Read(ctx context.Context, d *schema.ResourceDa
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -269,6 +279,10 @@ func resourceKubernetesDaemonSetV1Read(ctx context.Context, d *schema.ResourceDa
 		return diag.FromErr(err)
 	}
 
+	err = setResourceIdentityNamespaced(d, "apps/v1", "DaemonSet", namespace, name)
+	if err != nil {
+		return diag.FromErr(err)
+	}
 	return nil
 }
 
@@ -278,7 +292,7 @@ func resourceKubernetesDaemonSetV1Delete(ctx context.Context, d *schema.Resource
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -304,7 +318,7 @@ func resourceKubernetesDaemonSetV1Exists(ctx context.Context, d *schema.Resource
 		return false, err
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return false, err
 	}
@@ -320,22 +334,26 @@ func resourceKubernetesDaemonSetV1Exists(ctx context.Context, d *schema.Resource
 	return true, err
 }
 
-func waitForDaemonSetReplicasFunc(ctx context.Context, conn *kubernetes.Clientset, ns, name string) resource.RetryFunc {
-	return func() *resource.RetryError {
+func waitForDaemonSetPodsFunc(ctx context.Context, conn *kubernetes.Clientset, ns, name string) retry.RetryFunc {
+	return func() *retry.RetryError {
 		daemonSet, err := conn.AppsV1().DaemonSets(ns).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
-			return resource.NonRetryableError(err)
+			return retry.NonRetryableError(err)
 		}
 
-		desiredReplicas := daemonSet.Status.DesiredNumberScheduled
-		log.Printf("[DEBUG] Current number of labelled replicas of %q: %d (of %d)\n",
-			daemonSet.GetName(), daemonSet.Status.CurrentNumberScheduled, desiredReplicas)
+		desiredPods := daemonSet.Status.DesiredNumberScheduled
 
-		if daemonSet.Status.CurrentNumberScheduled == desiredReplicas {
-			return nil
+		if daemonSet.Generation > daemonSet.Status.ObservedGeneration {
+			return retry.RetryableError(fmt.Errorf("waiting for rollout to start."))
 		}
 
-		return resource.RetryableError(fmt.Errorf("Waiting for %d replicas of %q to be scheduled (%d)",
-			desiredReplicas, daemonSet.GetName(), daemonSet.Status.CurrentNumberScheduled))
+		if daemonSet.Generation == daemonSet.Status.ObservedGeneration {
+			if daemonSet.Status.NumberReady == desiredPods {
+				return nil
+			}
+			return retry.RetryableError(fmt.Errorf("waiting for rollout to finish: %d pods desired; %d pods ready",
+				desiredPods, daemonSet.Status.NumberReady))
+		}
+		return retry.NonRetryableError(fmt.Errorf("observed generation %d is not expected to be greater than generation %d", daemonSet.Status.ObservedGeneration, daemonSet.Generation))
 	}
 }

@@ -1,11 +1,16 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
+// NOTE this API has been deprecated and the resource should be removed
+// in the next major provider version.
+//
+//nolint:all
 package kubernetes
 
 import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	api "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 )
 
 func expandEndpointsAddresses(in *schema.Set) []api.EndpointAddress {
@@ -23,7 +28,7 @@ func expandEndpointsAddresses(in *schema.Set) []api.EndpointAddress {
 			r.IP = v
 		}
 		if v, ok := addrCfg["node_name"].(string); ok && v != "" {
-			r.NodeName = ptrToString(v)
+			r.NodeName = ptr.To(v)
 		}
 		addresses[i] = r
 	}

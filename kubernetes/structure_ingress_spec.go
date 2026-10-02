@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -194,12 +194,15 @@ func expandIngressBackend(l []interface{}) *v1beta1.IngressBackend {
 }
 
 func expandIngressTLS(l []interface{}) []v1beta1.IngressTLS {
-	if len(l) == 0 || l[0] == nil {
+	if len(l) == 0 {
 		return nil
 	}
 
 	tlsList := make([]v1beta1.IngressTLS, len(l))
 	for i, t := range l {
+		if t == nil {
+			t = map[string]interface{}{}
+		}
 		in := t.(map[string]interface{})
 		obj := v1beta1.IngressTLS{}
 

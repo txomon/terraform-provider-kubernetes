@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -15,6 +15,7 @@ import (
 
 func resourceKubernetesTokenRequestV1() *schema.Resource {
 	return &schema.Resource{
+		Description:   "TokenRequest requests a token for a given service account.",
 		CreateContext: resourceKubernetesTokenRequestV1Create,
 		ReadContext:   resourceKubernetesTokenRequestV1Read,
 		UpdateContext: resourceKubernetesTokenRequestV1Update,
@@ -71,7 +72,7 @@ func resourceKubernetesTokenRequestV1Create(ctx context.Context, d *schema.Resou
 	d.Set("spec", s)
 
 	log.Printf("[INFO] Submitted new TokenRequest: %#v", out)
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 
 	return resourceKubernetesTokenRequestV1Read(ctx, d, meta)
 }

@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -16,5 +16,6 @@ func resourceKubernetesCronJobV0() *schema.Resource {
 }
 
 func resourceKubernetesCronJobUpgradeV0(ctx context.Context, rawState map[string]interface{}, meta interface{}) (map[string]interface{}, error) {
-	return upgradeJobTemplatePodSpecWithResourcesFieldV0(ctx, rawState, meta)
+	// Return a nil error here to satisfy StateUpgradeFunc signature
+	return upgradeJobTemplatePodSpecWithResourcesFieldV0(ctx, rawState, meta), nil
 }

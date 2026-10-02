@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -15,16 +15,18 @@ import (
 	pkgApi "k8s.io/apimachinery/pkg/types"
 )
 
-func resourceKubernetesRoleBindingV1() *schema.Resource {
+func resourceKubernetesRoleBindingV1(deprecationMessage string) *schema.Resource {
 	return &schema.Resource{
-		CreateContext: resourceKubernetesRoleBindingV1Create,
-		ReadContext:   resourceKubernetesRoleBindingV1Read,
-		UpdateContext: resourceKubernetesRoleBindingV1Update,
-		DeleteContext: resourceKubernetesRoleBindingV1Delete,
+		Description:        "A RoleBinding may be used to grant permission at the namespace level",
+		CreateContext:      resourceKubernetesRoleBindingV1Create,
+		ReadContext:        resourceKubernetesRoleBindingV1Read,
+		DeprecationMessage: deprecationMessage,
+		UpdateContext:      resourceKubernetesRoleBindingV1Update,
+		DeleteContext:      resourceKubernetesRoleBindingV1Delete,
 		Importer: &schema.ResourceImporter{
-			StateContext: schema.ImportStatePassthroughContext,
+			StateContext: resourceIdentityImportNamespaced,
 		},
-
+		Identity: resourceIdentitySchemaNamespaced(),
 		Schema: map[string]*schema.Schema{
 			"metadata": metadataSchemaRBAC("roleBinding", true, true),
 			"role_ref": {
@@ -64,12 +66,11 @@ func resourceKubernetesRoleBindingV1Create(ctx context.Context, d *schema.Resour
 	}
 	log.Printf("[INFO] Creating new RoleBinding: %#v", binding)
 	out, err := conn.RbacV1().RoleBindings(metadata.Namespace).Create(ctx, binding, metav1.CreateOptions{})
-
 	if err != nil {
 		return diag.FromErr(err)
 	}
 	log.Printf("[INFO] Submitted new RoleBinding: %#v", out)
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 
 	return resourceKubernetesRoleBindingV1Read(ctx, d, meta)
 }
@@ -88,7 +89,7 @@ func resourceKubernetesRoleBindingV1Read(ctx context.Context, d *schema.Resource
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -119,7 +120,10 @@ func resourceKubernetesRoleBindingV1Read(ctx context.Context, d *schema.Resource
 	if err != nil {
 		return diag.FromErr(err)
 	}
-
+	err = setResourceIdentityNamespaced(d, "rbac.authorization.k8s.io/v1", "RoleBinding", namespace, name)
+	if err != nil {
+		return diag.FromErr(err)
+	}
 	return nil
 }
 
@@ -129,7 +133,7 @@ func resourceKubernetesRoleBindingV1Update(ctx context.Context, d *schema.Resour
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -149,7 +153,7 @@ func resourceKubernetesRoleBindingV1Update(ctx context.Context, d *schema.Resour
 		return diag.Errorf("Failed to update RoleBinding: %s", err)
 	}
 	log.Printf("[INFO] Submitted updated RoleBinding: %#v", out)
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 
 	return resourceKubernetesRoleBindingV1Read(ctx, d, meta)
 }
@@ -160,7 +164,7 @@ func resourceKubernetesRoleBindingV1Delete(ctx context.Context, d *schema.Resour
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -184,7 +188,7 @@ func resourceKubernetesRoleBindingV1Exists(ctx context.Context, d *schema.Resour
 		return false, err
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return false, err
 	}

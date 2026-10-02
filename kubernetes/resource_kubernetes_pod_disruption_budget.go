@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -26,10 +26,12 @@ var (
 
 func resourceKubernetesPodDisruptionBudget() *schema.Resource {
 	return &schema.Resource{
-		CreateContext: resourceKubernetesPodDisruptionBudgetCreate,
-		ReadContext:   resourceKubernetesPodDisruptionBudgetRead,
-		UpdateContext: resourceKubernetesPodDisruptionBudgetUpdate,
-		DeleteContext: resourceKubernetesPodDisruptionBudgetDelete,
+		DeprecationMessage: "Deprecated: this resource will be removed in the next major version of the provider. Use kubernetes_pod_disruption_budget_v1 instead.",
+		Description:        "A Pod Disruption Budget limits the number of pods of a replicated application that are down simultaneously from voluntary disruptions. For example, a quorum-based application would like to ensure that the number of replicas running is never brought below the number needed for a quorum. A web front end might want to ensure that the number of replicas serving load never falls below a certain percentage of the total.",
+		CreateContext:      resourceKubernetesPodDisruptionBudgetCreate,
+		ReadContext:        resourceKubernetesPodDisruptionBudgetRead,
+		UpdateContext:      resourceKubernetesPodDisruptionBudgetUpdate,
+		DeleteContext:      resourceKubernetesPodDisruptionBudgetDelete,
 		Importer: &schema.ResourceImporter{
 			StateContext: schema.ImportStatePassthroughContext,
 		},
@@ -84,7 +86,7 @@ func resourceKubernetesPodDisruptionBudgetUpdate(ctx context.Context, d *schema.
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -102,7 +104,7 @@ func resourceKubernetesPodDisruptionBudgetUpdate(ctx context.Context, d *schema.
 	}
 
 	log.Printf("[INFO] Submitted updated pod disruption budget: %#v", out)
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 
 	return resourceKubernetesPodDisruptionBudgetRead(ctx, d, meta)
 }
@@ -130,7 +132,7 @@ func resourceKubernetesPodDisruptionBudgetCreate(ctx context.Context, d *schema.
 	}
 
 	log.Printf("[INFO] Submitted new pod disruption budget: %#v", out)
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 
 	return resourceKubernetesPodDisruptionBudgetRead(ctx, d, meta)
 }
@@ -149,7 +151,7 @@ func resourceKubernetesPodDisruptionBudgetRead(ctx context.Context, d *schema.Re
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -181,7 +183,7 @@ func resourceKubernetesPodDisruptionBudgetDelete(ctx context.Context, d *schema.
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -208,7 +210,7 @@ func resourceKubernetesPodDisruptionBudgetExists(ctx context.Context, d *schema.
 		return false, err
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return false, err
 	}

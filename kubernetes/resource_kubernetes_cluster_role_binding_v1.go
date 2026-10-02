@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -15,16 +15,18 @@ import (
 	pkgApi "k8s.io/apimachinery/pkg/types"
 )
 
-func resourceKubernetesClusterRoleBindingV1() *schema.Resource {
+func resourceKubernetesClusterRoleBindingV1(deprecationMessage string) *schema.Resource {
 	return &schema.Resource{
-		CreateContext: resourceKubernetesClusterRoleBindingV1Create,
-		ReadContext:   resourceKubernetesClusterRoleBindingV1Read,
-		UpdateContext: resourceKubernetesClusterRoleBindingV1Update,
-		DeleteContext: resourceKubernetesClusterRoleBindingV1Delete,
+		Description:        "A ClusterRoleBinding may be used to grant permission at the cluster level and in all namespaces",
+		CreateContext:      resourceKubernetesClusterRoleBindingV1Create,
+		ReadContext:        resourceKubernetesClusterRoleBindingV1Read,
+		DeprecationMessage: deprecationMessage,
+		UpdateContext:      resourceKubernetesClusterRoleBindingV1Update,
+		DeleteContext:      resourceKubernetesClusterRoleBindingV1Delete,
 		Importer: &schema.ResourceImporter{
-			StateContext: schema.ImportStatePassthroughContext,
+			StateContext: resourceIdentityImportNonNamespaced,
 		},
-
+		Identity: resourceIdentitySchemaNonNamespaced(),
 		Schema: map[string]*schema.Schema{
 			"metadata": metadataSchemaRBAC("clusterRoleBinding", true, false),
 			"role_ref": {
@@ -64,7 +66,6 @@ func resourceKubernetesClusterRoleBindingV1Create(ctx context.Context, d *schema
 	}
 	log.Printf("[INFO] Creating new ClusterRoleBinding: %#v", binding)
 	binding, err = conn.RbacV1().ClusterRoleBindings().Create(ctx, binding, metav1.CreateOptions{})
-
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -112,6 +113,11 @@ func resourceKubernetesClusterRoleBindingV1Read(ctx context.Context, d *schema.R
 	flattenedSubjects := flattenRBACSubjects(binding.Subjects)
 	log.Printf("[DEBUG] Flattened ClusterRoleBinding subjects: %#v", flattenedSubjects)
 	err = d.Set("subject", flattenedSubjects)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	err = setResourceIdentityNonNamespaced(d, "rbac.authorization.k8s.io/v1", "ClusterRoleBinding", name)
 	if err != nil {
 		return diag.FromErr(err)
 	}

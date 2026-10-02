@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -8,7 +8,7 @@ import (
 	"log"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 	corev1 "k8s.io/api/core/v1"
@@ -17,8 +17,8 @@ import (
 	pkgApi "k8s.io/apimachinery/pkg/types"
 )
 
-func resourceKubernetesDefaultServiceAccountV1() *schema.Resource {
-	serviceAccountResource := resourceKubernetesServiceAccountV1()
+func resourceKubernetesDefaultServiceAccountV1(deprecationMessage string) *schema.Resource {
+	serviceAccountResource := resourceKubernetesServiceAccountV1(deprecationMessage)
 
 	metaSchema := namespacedMetadataSchema("service account", false)
 
@@ -44,15 +44,15 @@ func resourceKubernetesDefaultServiceAccountV1Create(ctx context.Context, d *sch
 	svcAcc := corev1.ServiceAccount{ObjectMeta: metadata}
 
 	log.Printf("[INFO] Checking for default service account existence: %s", metadata.Namespace)
-	err = resource.RetryContext(ctx, d.Timeout(schema.TimeoutCreate), func() *resource.RetryError {
+	err = retry.RetryContext(ctx, d.Timeout(schema.TimeoutCreate), func() *retry.RetryError {
 		_, err := conn.CoreV1().ServiceAccounts(metadata.Namespace).Get(ctx, metadata.Name, metav1.GetOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
 				log.Printf("[INFO] Default service account does not exist, will retry: %s", metadata.Namespace)
-				return resource.RetryableError(err)
+				return retry.RetryableError(err)
 			}
 
-			return resource.NonRetryableError(err)
+			return retry.NonRetryableError(err)
 		}
 
 		log.Printf("[INFO] Default service account exists: %s", metadata.Namespace)
@@ -101,7 +101,7 @@ func resourceKubernetesDefaultServiceAccountV1Create(ctx context.Context, d *sch
 	}
 	log.Printf("[INFO] Submitted updated default service account: %#v", out)
 
-	d.SetId(buildId(metadata))
+	d.SetId(BuildId(metadata))
 
 	return resourceKubernetesServiceAccountV1Read(ctx, d, meta)
 }

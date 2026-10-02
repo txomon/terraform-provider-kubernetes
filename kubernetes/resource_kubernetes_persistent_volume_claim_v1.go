@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -11,7 +11,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -20,7 +20,7 @@ import (
 	pkgApi "k8s.io/apimachinery/pkg/types"
 )
 
-func resourceKubernetesPersistentVolumeClaimV1() *schema.Resource {
+func resourceKubernetesPersistentVolumeClaimV1(deprecationMessage string) *schema.Resource {
 	fields := persistentVolumeClaimFields()
 	// The 'wait_until_bound' control attribute only makes sense in stand-alone PVCs,
 	// so adding it on top of the standard PVC fields which are re-usable for other resources.
@@ -31,10 +31,12 @@ func resourceKubernetesPersistentVolumeClaimV1() *schema.Resource {
 		Default:     true,
 	}
 	return &schema.Resource{
-		CreateContext: resourceKubernetesPersistentVolumeClaimV1Create,
-		ReadContext:   resourceKubernetesPersistentVolumeClaimV1Read,
-		UpdateContext: resourceKubernetesPersistentVolumeClaimV1Update,
-		DeleteContext: resourceKubernetesPersistentVolumeClaimV1Delete,
+		Description:        "This resource allows the user to request for and claim to a persistent volume.",
+		CreateContext:      resourceKubernetesPersistentVolumeClaimV1Create,
+		ReadContext:        resourceKubernetesPersistentVolumeClaimV1Read,
+		DeprecationMessage: deprecationMessage,
+		UpdateContext:      resourceKubernetesPersistentVolumeClaimV1Update,
+		DeleteContext:      resourceKubernetesPersistentVolumeClaimV1Delete,
 		Importer: &schema.ResourceImporter{
 			StateContext: func(ctx context.Context, d *schema.ResourceData, meta interface{}) ([]*schema.ResourceData, error) {
 				d.Set("wait_until_bound", true)
@@ -109,11 +111,11 @@ func resourceKubernetesPersistentVolumeClaimV1Create(ctx context.Context, d *sch
 	}
 	log.Printf("[INFO] Submitted new persistent volume claim: %#v", out)
 
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 	name := out.ObjectMeta.Name
 
 	if d.Get("wait_until_bound").(bool) {
-		stateConf := &resource.StateChangeConf{
+		stateConf := &retry.StateChangeConf{
 			Target:  []string{"Bound"},
 			Pending: []string{"Pending"},
 			Timeout: d.Timeout(schema.TimeoutCreate),
@@ -170,7 +172,7 @@ func resourceKubernetesPersistentVolumeClaimV1Read(ctx context.Context, d *schem
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -200,7 +202,7 @@ func resourceKubernetesPersistentVolumeClaimV1Update(ctx context.Context, d *sch
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -239,7 +241,7 @@ func resourceKubernetesPersistentVolumeClaimV1Delete(ctx context.Context, d *sch
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -253,18 +255,18 @@ func resourceKubernetesPersistentVolumeClaimV1Delete(ctx context.Context, d *sch
 		return diag.FromErr(err)
 	}
 
-	err = resource.RetryContext(ctx, d.Timeout(schema.TimeoutDelete), func() *resource.RetryError {
+	err = retry.RetryContext(ctx, d.Timeout(schema.TimeoutDelete), func() *retry.RetryError {
 		out, err := conn.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
 				return nil
 			}
-			return resource.NonRetryableError(err)
+			return retry.NonRetryableError(err)
 		}
 
 		log.Printf("[DEBUG] Current state of persistent volume claim finalizers: %#v", out.Finalizers)
 		e := fmt.Errorf("Persistent volume claim %s still exists with finalizers: %v", name, out.Finalizers)
-		return resource.RetryableError(e)
+		return retry.RetryableError(e)
 	})
 	if err != nil {
 		return diag.FromErr(err)
@@ -282,7 +284,7 @@ func resourceKubernetesPersistentVolumeClaimV1Exists(ctx context.Context, d *sch
 		return false, err
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return false, err
 	}

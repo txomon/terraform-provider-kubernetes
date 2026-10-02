@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package provider
@@ -15,6 +15,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // ImportResourceState function
@@ -25,13 +26,38 @@ func (s *RawProviderServer) ImportResourceState(ctx context.Context, req *tfprot
 	// Presumably the Kubernetes API machinery already has a standard for expressing such a group. We should look there first.
 	resp := &tfprotov5.ImportResourceStateResponse{}
 
+	cp := req.ClientCapabilities
+	if cp != nil && cp.DeferralAllowed && s.clientConfigUnknown {
+		v := tftypes.NewValue(tftypes.DynamicPseudoType, tftypes.UnknownValue)
+		dv, err := tfprotov5.NewDynamicValue(v.Type(), v)
+		if err != nil {
+			return resp, err
+		}
+		// if client support it, request deferral when client configuration not fully known
+		resp.ImportedResources = append(resp.ImportedResources, &tfprotov5.ImportedResource{
+			TypeName: req.TypeName,
+			State:    &dv,
+		})
+		resp.Deferred = &tfprotov5.Deferred{
+			Reason: tfprotov5.DeferredReasonProviderConfigUnknown,
+		}
+		return resp, nil
+	}
+
 	execDiag := s.canExecute()
 	if len(execDiag) > 0 {
 		resp.Diagnostics = append(resp.Diagnostics, execDiag...)
 		return resp, nil
 	}
 
-	gvk, name, namespace, err := util.ParseResourceID(req.ID)
+	var gvk schema.GroupVersionKind
+	var name, namespace string
+	var err error
+	if req.Identity != nil {
+		gvk, name, namespace, err = parseResourceIdentityData(req.Identity)
+	} else {
+		gvk, name, namespace, err = util.ParseResourceID(req.ID)
+	}
 	if err != nil {
 		resp.Diagnostics = append(resp.Diagnostics, &tfprotov5.Diagnostic{
 			Severity: tfprotov5.DiagnosticSeverityError,
@@ -40,6 +66,7 @@ func (s *RawProviderServer) ImportResourceState(ctx context.Context, req *tfprot
 		})
 	}
 	s.logger.Trace("[ImportResourceState]", "[ID]", gvk, name, namespace)
+
 	rt, err := GetResourceType(req.TypeName)
 	if err != nil {
 		resp.Diagnostics = append(resp.Diagnostics, &tfprotov5.Diagnostic{
@@ -178,10 +205,17 @@ func (s *RawProviderServer) ImportResourceState(ctx context.Context, req *tfprot
 			Detail:   err.Error(),
 		})
 	}
+	idData, err := createIdentityData(ro)
+	if err != nil {
+		return resp, err
+	}
 	nr := &tfprotov5.ImportedResource{
 		TypeName: req.TypeName,
 		State:    &impState,
 		Private:  fb,
+		Identity: &tfprotov5.ResourceIdentityData{
+			IdentityData: &idData,
+		},
 	}
 	resp.ImportedResources = append(resp.ImportedResources, nr)
 	resp.Diagnostics = append(resp.Diagnostics, &tfprotov5.Diagnostic{
@@ -189,5 +223,6 @@ func (s *RawProviderServer) ImportResourceState(ctx context.Context, req *tfprot
 		Summary:  "Apply needed after 'import'",
 		Detail:   "Please run apply after a successful import to realign the resource state to the configuration in Terraform.",
 	})
+
 	return resp, nil
 }

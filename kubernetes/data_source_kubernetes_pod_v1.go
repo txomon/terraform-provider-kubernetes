@@ -1,25 +1,27 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
 
 import (
 	"context"
-	"fmt"
 	"log"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func dataSourceKubernetesPodV1() *schema.Resource {
+func dataSourceKubernetesPodV1(deprecationMessage string) *schema.Resource {
 	podSpecFields := podSpecFields(false, false)
 	// Setting this default to false prevents a perpetual diff caused by volume_mounts
 	// being mutated on the server side as Kubernetes automatically adds a mount
 	// for the service account token
 	return &schema.Resource{
-		ReadContext: dataSourceKubernetesPodV1Read,
+		Description:        "A pod is a group of one or more containers, the shared storage for those containers, and options about how to run the containers. Pods are always co-located and co-scheduled, and run in a shared context. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod/.",
+		ReadContext:        dataSourceKubernetesPodV1Read,
+		DeprecationMessage: deprecationMessage,
 
 		Schema: map[string]*schema.Schema{
 			"metadata": namespacedMetadataSchema("pod", true),
@@ -51,22 +53,26 @@ func dataSourceKubernetesPodV1Read(ctx context.Context, d *schema.ResourceData, 
 		Namespace: metadata.Namespace,
 		Name:      metadata.Name,
 	}
-	d.SetId(buildId(om))
+	d.SetId(BuildId(om))
 
 	log.Printf("[INFO] Reading pod %s", metadata.Name)
 	pod, err := conn.CoreV1().Pods(metadata.Namespace).Get(ctx, metadata.Name, metav1.GetOptions{})
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
 		log.Printf("[DEBUG] Received error: %#v", err)
 		return diag.FromErr(err)
 	}
 	log.Printf("[INFO] Received pod: %#v", pod)
 
-	err = d.Set("metadata", flattenMetadata(pod.ObjectMeta, d, meta))
+	err = d.Set("metadata", flattenMetadataFields(pod.ObjectMeta))
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
-	podSpec, err := flattenPodSpec(pod.Spec)
+	// isTemplate argument here is equal to 'true' because we want to keep all attributes that Kubernetes unchanged.
+	podSpec, err := flattenPodSpec(pod.Spec, true)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -75,8 +81,10 @@ func dataSourceKubernetesPodV1Read(ctx context.Context, d *schema.ResourceData, 
 	if err != nil {
 		return diag.FromErr(err)
 	}
-	statusPhase := fmt.Sprintf("%v", pod.Status.Phase)
-	d.Set("status", statusPhase)
+	err = d.Set("status", pod.Status.Phase)
+	if err != nil {
+		return diag.FromErr(err)
+	}
 
 	return nil
 

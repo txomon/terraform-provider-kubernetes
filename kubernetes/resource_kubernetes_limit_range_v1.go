@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -16,12 +16,14 @@ import (
 	pkgApi "k8s.io/apimachinery/pkg/types"
 )
 
-func resourceKubernetesLimitRangeV1() *schema.Resource {
+func resourceKubernetesLimitRangeV1(deprecationMessage string) *schema.Resource {
 	return &schema.Resource{
-		CreateContext: resourceKubernetesLimitRangeV1Create,
-		ReadContext:   resourceKubernetesLimitRangeV1Read,
-		UpdateContext: resourceKubernetesLimitRangeV1Update,
-		DeleteContext: resourceKubernetesLimitRangeV1Delete,
+		Description:        "Limit Range sets resource usage limits (e.g. memory, cpu, storage) for supported kinds of resources in a namespace. Read more in [the official docs](https://kubernetes.io/docs/concepts/policy/limit-range/).",
+		CreateContext:      resourceKubernetesLimitRangeV1Create,
+		ReadContext:        resourceKubernetesLimitRangeV1Read,
+		DeprecationMessage: deprecationMessage,
+		UpdateContext:      resourceKubernetesLimitRangeV1Update,
+		DeleteContext:      resourceKubernetesLimitRangeV1Delete,
 		Importer: &schema.ResourceImporter{
 			StateContext: schema.ImportStatePassthroughContext,
 		},
@@ -103,7 +105,7 @@ func resourceKubernetesLimitRangeV1Create(ctx context.Context, d *schema.Resourc
 		return diag.Errorf("Failed to create limit range: %s", err)
 	}
 	log.Printf("[INFO] Submitted new limit range: %#v", out)
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 
 	return resourceKubernetesLimitRangeV1Read(ctx, d, meta)
 }
@@ -122,7 +124,7 @@ func resourceKubernetesLimitRangeV1Read(ctx context.Context, d *schema.ResourceD
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -152,7 +154,7 @@ func resourceKubernetesLimitRangeV1Update(ctx context.Context, d *schema.Resourc
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -178,7 +180,7 @@ func resourceKubernetesLimitRangeV1Update(ctx context.Context, d *schema.Resourc
 		return diag.Errorf("Failed to update limit range: %s", err)
 	}
 	log.Printf("[INFO] Submitted updated limit range: %#v", out)
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 
 	return resourceKubernetesLimitRangeV1Read(ctx, d, meta)
 }
@@ -189,7 +191,7 @@ func resourceKubernetesLimitRangeV1Delete(ctx context.Context, d *schema.Resourc
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -212,7 +214,7 @@ func resourceKubernetesLimitRangeV1Exists(ctx context.Context, d *schema.Resourc
 		return false, err
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return false, err
 	}

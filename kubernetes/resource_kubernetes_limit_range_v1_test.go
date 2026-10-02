@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -22,8 +22,6 @@ func TestAccKubernetesLimitRangeV1_basic(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesLimitRangeDestroy,
 		Steps: []resource.TestStep{
@@ -118,8 +116,6 @@ func TestAccKubernetesLimitRangeV1_empty(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesLimitRangeDestroy,
 		Steps: []resource.TestStep{
@@ -148,8 +144,6 @@ func TestAccKubernetesLimitRangeV1_generatedName(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesLimitRangeDestroy,
 		Steps: []resource.TestStep{
@@ -178,8 +172,6 @@ func TestAccKubernetesLimitRangeV1_typeChange(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesLimitRangeDestroy,
 		Steps: []resource.TestStep{
@@ -228,8 +220,6 @@ func TestAccKubernetesLimitRangeV1_multipleLimits(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesLimitRangeDestroy,
 		Steps: []resource.TestStep{
@@ -274,7 +264,7 @@ func testAccCheckKubernetesLimitRangeDestroy(s *terraform.State) error {
 			continue
 		}
 
-		namespace, name, err := idParts(rs.Primary.ID)
+		namespace, name, err := IdParts(rs.Primary.ID)
 		if err != nil {
 			return err
 		}
@@ -303,7 +293,7 @@ func testAccCheckKubernetesLimitRangeExists(n string, obj *api.LimitRange) resou
 		}
 		ctx := context.TODO()
 
-		namespace, name, err := idParts(rs.Primary.ID)
+		namespace, name, err := IdParts(rs.Primary.ID)
 		if err != nil {
 			return err
 		}
@@ -319,7 +309,7 @@ func testAccCheckKubernetesLimitRangeExists(n string, obj *api.LimitRange) resou
 }
 
 func testAccKubernetesLimitRangeV1Config_empty(name string) string {
-	return fmt.Sprintf(`resource "kubernetes_namespace_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_namespace" "test" {
   metadata {
     name = %[1]q
   }
@@ -328,14 +318,14 @@ func testAccKubernetesLimitRangeV1Config_empty(name string) string {
 resource "kubernetes_limit_range_v1" "test" {
   metadata {
     name      = %[1]q
-    namespace = kubernetes_namespace_v1.test.metadata.0.name
+    namespace = kubernetes_namespace.test.metadata.0.name
   }
 }
 `, name)
 }
 
 func testAccKubernetesLimitRangeV1Config_basic(name string) string {
-	return fmt.Sprintf(`resource "kubernetes_namespace_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_namespace" "test" {
   metadata {
     name = %[1]q
   }
@@ -354,7 +344,7 @@ resource "kubernetes_limit_range_v1" "test" {
     }
 
     name      = %[1]q
-    namespace = kubernetes_namespace_v1.test.metadata.0.name
+    namespace = kubernetes_namespace.test.metadata.0.name
   }
 
   spec {
@@ -377,7 +367,7 @@ resource "kubernetes_limit_range_v1" "test" {
 }
 
 func testAccKubernetesLimitRangeV1Config_metaModified(name string) string {
-	return fmt.Sprintf(`resource "kubernetes_namespace_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_namespace" "test" {
   metadata {
     name = %[1]q
   }
@@ -397,7 +387,7 @@ resource "kubernetes_limit_range_v1" "test" {
     }
 
     name      = %[1]q
-    namespace = kubernetes_namespace_v1.test.metadata.0.name
+    namespace = kubernetes_namespace.test.metadata.0.name
   }
 
   spec {
@@ -420,7 +410,7 @@ resource "kubernetes_limit_range_v1" "test" {
 }
 
 func testAccKubernetesLimitRangeV1Config_specModified(name string) string {
-	return fmt.Sprintf(`resource "kubernetes_namespace_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_namespace" "test" {
   metadata {
     name = %[1]q
   }
@@ -429,7 +419,7 @@ func testAccKubernetesLimitRangeV1Config_specModified(name string) string {
 resource "kubernetes_limit_range_v1" "test" {
   metadata {
     name      = %[1]q
-    namespace = kubernetes_namespace_v1.test.metadata.0.name
+    namespace = kubernetes_namespace.test.metadata.0.name
   }
 
   spec {
@@ -456,7 +446,7 @@ resource "kubernetes_limit_range_v1" "test" {
 }
 
 func testAccKubernetesLimitRangeV1Config_generatedName(prefix, ns string) string {
-	return fmt.Sprintf(`resource "kubernetes_namespace_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_namespace" "test" {
   metadata {
     name = %[1]q
   }
@@ -465,7 +455,7 @@ func testAccKubernetesLimitRangeV1Config_generatedName(prefix, ns string) string
 resource "kubernetes_limit_range_v1" "test" {
   metadata {
     generate_name = %[2]q
-    namespace     = kubernetes_namespace_v1.test.metadata.0.name
+    namespace     = kubernetes_namespace.test.metadata.0.name
   }
 
   spec {
@@ -478,7 +468,7 @@ resource "kubernetes_limit_range_v1" "test" {
 }
 
 func testAccKubernetesLimitRangeV1Config_typeChange(name string) string {
-	return fmt.Sprintf(`resource "kubernetes_namespace_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_namespace" "test" {
   metadata {
     name = %[1]q
   }
@@ -487,7 +477,7 @@ func testAccKubernetesLimitRangeV1Config_typeChange(name string) string {
 resource "kubernetes_limit_range_v1" "test" {
   metadata {
     name      = %[1]q
-    namespace = kubernetes_namespace_v1.test.metadata.0.name
+    namespace = kubernetes_namespace.test.metadata.0.name
   }
 
   spec {
@@ -505,7 +495,7 @@ resource "kubernetes_limit_range_v1" "test" {
 }
 
 func testAccKubernetesLimitRangeV1Config_typeChangeModified(name string) string {
-	return fmt.Sprintf(`resource "kubernetes_namespace_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_namespace" "test" {
   metadata {
     name = %[1]q
   }
@@ -514,7 +504,7 @@ func testAccKubernetesLimitRangeV1Config_typeChangeModified(name string) string 
 resource "kubernetes_limit_range_v1" "test" {
   metadata {
     name      = %[1]q
-    namespace = kubernetes_namespace_v1.test.metadata.0.name
+    namespace = kubernetes_namespace.test.metadata.0.name
   }
 
   spec {
@@ -532,7 +522,7 @@ resource "kubernetes_limit_range_v1" "test" {
 }
 
 func testAccKubernetesLimitRangeV1Config_multipleLimits(name string) string {
-	return fmt.Sprintf(`resource "kubernetes_namespace_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_namespace" "test" {
   metadata {
     name = %[1]q
   }
@@ -541,7 +531,7 @@ func testAccKubernetesLimitRangeV1Config_multipleLimits(name string) string {
 resource "kubernetes_limit_range_v1" "test" {
   metadata {
     name      = %[1]q
-    namespace = kubernetes_namespace_v1.test.metadata.0.name
+    namespace = kubernetes_namespace.test.metadata.0.name
   }
 
   spec {

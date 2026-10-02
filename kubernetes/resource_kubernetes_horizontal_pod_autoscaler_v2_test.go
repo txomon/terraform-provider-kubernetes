@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -9,10 +9,14 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
+	"github.com/hashicorp/terraform-plugin-testing/statecheck"
+	"github.com/hashicorp/terraform-plugin-testing/tfversion"
 )
 
 func TestAccKubernetesHorizontalPodAutoscalerV2_minimal(t *testing.T) {
@@ -24,7 +28,6 @@ func TestAccKubernetesHorizontalPodAutoscalerV2_minimal(t *testing.T) {
 			testAccPreCheck(t)
 			skipIfClusterVersionLessThan(t, "1.23.0")
 		},
-		IDRefreshName:     resourceName,
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesHorizontalPodAutoscalerV2Destroy,
 		Steps: []resource.TestStep{
@@ -54,6 +57,43 @@ func TestAccKubernetesHorizontalPodAutoscalerV2_minimal(t *testing.T) {
 	})
 }
 
+func TestAccKubernetesHorizontalPodAutoscalerV2_identity(t *testing.T) {
+	name := fmt.Sprintf("tf-acc-test-%s", acctest.RandString(10))
+	resourceName := "kubernetes_horizontal_pod_autoscaler_v2.test"
+
+	resource.ParallelTest(t, resource.TestCase{
+		PreCheck: func() {
+			testAccPreCheck(t)
+			skipIfClusterVersionLessThan(t, "1.23.0")
+		},
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckKubernetesHorizontalPodAutoscalerV2Destroy,
+		TerraformVersionChecks: []tfversion.TerraformVersionCheck{
+			tfversion.SkipBelow(tfversion.Version1_12_0),
+		},
+		Steps: []resource.TestStep{
+			{
+				Config: testAccKubernetesHorizontalPodAutoscalerV2Config_basic(name),
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectIdentity(
+						resourceName, map[string]knownvalue.Check{
+							"namespace":   knownvalue.StringExact("default"),
+							"name":        knownvalue.StringExact(name),
+							"api_version": knownvalue.StringExact("autoscaling/v2"),
+							"kind":        knownvalue.StringExact("HorizontalPodAutoscaler"),
+						},
+					),
+				},
+			},
+			{
+				ResourceName:    resourceName,
+				ImportState:     true,
+				ImportStateKind: resource.ImportBlockWithResourceIdentity,
+			},
+		},
+	})
+}
+
 func TestAccKubernetesHorizontalPodAutoscalerV2_basic(t *testing.T) {
 	name := fmt.Sprintf("tf-acc-test-%s", acctest.RandString(10))
 	resourceName := "kubernetes_horizontal_pod_autoscaler_v2.test"
@@ -63,8 +103,7 @@ func TestAccKubernetesHorizontalPodAutoscalerV2_basic(t *testing.T) {
 			testAccPreCheck(t)
 			skipIfClusterVersionLessThan(t, "1.23.0")
 		},
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
+
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesHorizontalPodAutoscalerV2Destroy,
 		Steps: []resource.TestStep{
@@ -185,8 +224,7 @@ func TestAccKubernetesHorizontalPodAutoscalerV2_containerResource(t *testing.T) 
 			testAccPreCheck(t)
 			skipIfClusterVersionLessThan(t, "1.23.0")
 		},
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
+
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesHorizontalPodAutoscalerV2Destroy,
 		ErrorCheck: func(err error) error {
@@ -228,7 +266,6 @@ func TestAccKubernetesHorizontalPodAutoscalerV2_containerResource(t *testing.T) 
 
 func testAccCheckKubernetesHorizontalPodAutoscalerV2Destroy(s *terraform.State) error {
 	conn, err := testAccProvider.Meta().(KubeClientsets).MainClientset()
-
 	if err != nil {
 		return err
 	}
@@ -239,7 +276,7 @@ func testAccCheckKubernetesHorizontalPodAutoscalerV2Destroy(s *terraform.State) 
 			continue
 		}
 
-		namespace, name, err := idParts(rs.Primary.ID)
+		namespace, name, err := IdParts(rs.Primary.ID)
 		if err != nil {
 			return err
 		}
@@ -268,7 +305,7 @@ func testAccCheckKubernetesHorizontalPodAutoscalerV2Exists(n string) resource.Te
 		}
 		ctx := context.TODO()
 
-		namespace, name, err := idParts(rs.Primary.ID)
+		namespace, name, err := IdParts(rs.Primary.ID)
 		if err != nil {
 			return err
 		}
@@ -300,8 +337,9 @@ func testAccKubernetesHorizontalPodAutoscalerV2Config_minimal(name string) strin
     max_replicas = 10
 
     scale_target_ref {
-      kind = "Deployment"
-      name = "TerraformAccTest"
+      api_version = "apps/v1"
+      kind        = "Deployment"
+      name        = "TerraformAccTest"
     }
   }
 }
@@ -326,8 +364,9 @@ func testAccKubernetesHorizontalPodAutoscalerV2Config_basic(name string) string 
     max_replicas = 10
 
     scale_target_ref {
-      kind = "Deployment"
-      name = "TerraformAccTest"
+      api_version = "apps/v1"
+      kind        = "Deployment"
+      name        = "TerraformAccTest"
     }
 
     behavior {
@@ -449,8 +488,9 @@ func testAccKubernetesHorizontalPodAutoscalerV2Config_modified(name string) stri
     max_replicas = 100
 
     scale_target_ref {
-      kind = "Deployment"
-      name = "TerraformAccTest"
+      api_version = "apps/v1"
+      kind        = "Deployment"
+      name        = "TerraformAccTest"
     }
 
     behavior {

@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -19,6 +19,7 @@ import (
 
 func resourceKubernetesEndpointSliceV1() *schema.Resource {
 	return &schema.Resource{
+		Description:   "An EndpointSlice contains references to a set of network endpoints.",
 		CreateContext: resourceKubernetesEndpointSliceV1Create,
 		ReadContext:   resourceKubernetesEndpointSliceV1Read,
 		UpdateContext: resourceKubernetesEndpointSliceV1Update,
@@ -71,7 +72,7 @@ func resourceKubernetesEndpointSliceV1Create(ctx context.Context, d *schema.Reso
 		return diag.Errorf("Failed to create endpoint_slice because: %s", err)
 	}
 	log.Printf("[INFO] Submitted new endpoint_slice: %#v", out)
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 
 	return resourceKubernetesEndpointSliceV1Read(ctx, d, meta)
 }
@@ -82,7 +83,7 @@ func resourceKubernetesEndpointSliceV1Read(ctx context.Context, d *schema.Resour
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -126,7 +127,7 @@ func resourceKubernetesEndpointSliceV1Update(ctx context.Context, d *schema.Reso
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.Errorf("Failed to update endpointSlice because: %s", err)
 	}
@@ -163,7 +164,7 @@ func resourceKubernetesEndpointSliceV1Update(ctx context.Context, d *schema.Reso
 		return diag.Errorf("Failed to update endpointSlice: %s", err)
 	}
 	log.Printf("[INFO] Submitted updated endpointSlice: %#v", out)
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 
 	return resourceKubernetesEndpointSliceV1Read(ctx, d, meta)
 }
@@ -174,7 +175,7 @@ func resourceKubernetesEndpointSliceV1Delete(ctx context.Context, d *schema.Reso
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.Errorf("Failed to delete endpointSlice because: %s", err)
 	}

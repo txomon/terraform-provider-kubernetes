@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -11,7 +11,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 	api "k8s.io/api/core/v1"
@@ -20,12 +20,14 @@ import (
 	pkgApi "k8s.io/apimachinery/pkg/types"
 )
 
-func resourceKubernetesResourceQuotaV1() *schema.Resource {
+func resourceKubernetesResourceQuotaV1(deprecationMessage string) *schema.Resource {
 	return &schema.Resource{
-		CreateContext: resourceKubernetesResourceQuotaV1Create,
-		ReadContext:   resourceKubernetesResourceQuotaV1Read,
-		UpdateContext: resourceKubernetesResourceQuotaV1Update,
-		DeleteContext: resourceKubernetesResourceQuotaV1Delete,
+		Description:        "A resource quota provides constraints that limit aggregate resource consumption per namespace. It can limit the quantity of objects that can be created in a namespace by type, as well as the total amount of compute resources that may be consumed by resources in that project.",
+		CreateContext:      resourceKubernetesResourceQuotaV1Create,
+		ReadContext:        resourceKubernetesResourceQuotaV1Read,
+		DeprecationMessage: deprecationMessage,
+		UpdateContext:      resourceKubernetesResourceQuotaV1Update,
+		DeleteContext:      resourceKubernetesResourceQuotaV1Delete,
 		Importer: &schema.ResourceImporter{
 			StateContext: schema.ImportStatePassthroughContext,
 		},
@@ -128,19 +130,19 @@ func resourceKubernetesResourceQuotaV1Create(ctx context.Context, d *schema.Reso
 		return diag.Errorf("Failed to create resource quota: %s", err)
 	}
 	log.Printf("[INFO] Submitted new resource quota: %#v", out)
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 
-	err = resource.RetryContext(ctx, d.Timeout(schema.TimeoutCreate), func() *resource.RetryError {
+	err = retry.RetryContext(ctx, d.Timeout(schema.TimeoutCreate), func() *retry.RetryError {
 		quota, err := conn.CoreV1().ResourceQuotas(out.Namespace).Get(ctx, out.Name, metav1.GetOptions{})
 		if err != nil {
-			return resource.NonRetryableError(err)
+			return retry.NonRetryableError(err)
 		}
 		if resourceListEquals(spec.Hard, quota.Status.Hard) {
 			return nil
 		}
 		err = fmt.Errorf("Quotas don't match after creation.\nExpected: %#v\nGiven: %#v",
 			spec.Hard, quota.Status.Hard)
-		return resource.RetryableError(err)
+		return retry.RetryableError(err)
 	})
 	if err != nil {
 		return diag.FromErr(err)
@@ -163,7 +165,7 @@ func resourceKubernetesResourceQuotaV1Read(ctx context.Context, d *schema.Resour
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -202,7 +204,7 @@ func resourceKubernetesResourceQuotaV1Update(ctx context.Context, d *schema.Reso
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -231,20 +233,20 @@ func resourceKubernetesResourceQuotaV1Update(ctx context.Context, d *schema.Reso
 		return diag.Errorf("Failed to update resource quota: %s", err)
 	}
 	log.Printf("[INFO] Submitted updated resource quota: %#v", out)
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 
 	if waitForChangedSpec {
-		err = resource.RetryContext(ctx, d.Timeout(schema.TimeoutUpdate), func() *resource.RetryError {
+		err = retry.RetryContext(ctx, d.Timeout(schema.TimeoutUpdate), func() *retry.RetryError {
 			quota, err := conn.CoreV1().ResourceQuotas(namespace).Get(ctx, name, metav1.GetOptions{})
 			if err != nil {
-				return resource.NonRetryableError(err)
+				return retry.NonRetryableError(err)
 			}
 			if resourceListEquals(spec.Hard, quota.Status.Hard) {
 				return nil
 			}
 			err = fmt.Errorf("Quotas don't match after update.\nExpected: %#v\nGiven: %#v",
 				spec.Hard, quota.Status.Hard)
-			return resource.RetryableError(err)
+			return retry.RetryableError(err)
 		})
 		if err != nil {
 			return diag.FromErr(err)
@@ -260,7 +262,7 @@ func resourceKubernetesResourceQuotaV1Delete(ctx context.Context, d *schema.Reso
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -286,7 +288,7 @@ func resourceKubernetesResourceQuotaV1Exists(ctx context.Context, d *schema.Reso
 		return false, err
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return false, err
 	}

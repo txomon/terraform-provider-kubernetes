@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -11,7 +11,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -19,16 +19,19 @@ import (
 	pkgApi "k8s.io/apimachinery/pkg/types"
 )
 
-func resourceKubernetesNamespaceV1() *schema.Resource {
+func resourceKubernetesNamespaceV1(deprecationMessage string) *schema.Resource {
 	return &schema.Resource{
-		CreateContext: resourceKubernetesNamespaceV1Create,
-		ReadContext:   resourceKubernetesNamespaceV1Read,
+		Description:        "Kubernetes supports multiple virtual clusters backed by the same physical cluster. These virtual clusters are called namespaces. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/.",
+		CreateContext:      resourceKubernetesNamespaceV1Create,
+		ReadContext:        resourceKubernetesNamespaceV1Read,
+		DeprecationMessage: deprecationMessage,
+
 		UpdateContext: resourceKubernetesNamespaceV1Update,
 		DeleteContext: resourceKubernetesNamespaceV1Delete,
 		Importer: &schema.ResourceImporter{
-			StateContext: schema.ImportStatePassthroughContext,
+			StateContext: resourceIdentityImportNonNamespaced,
 		},
-
+		Identity: resourceIdentitySchemaNonNamespaced(),
 		Schema: map[string]*schema.Schema{
 			"metadata": metadataSchema("namespace", true),
 			"wait_for_default_service_account": {
@@ -64,15 +67,15 @@ func resourceKubernetesNamespaceV1Create(ctx context.Context, d *schema.Resource
 
 	if d.Get("wait_for_default_service_account").(bool) {
 		log.Printf("[DEBUG] Waiting for default service account to be created")
-		err = resource.RetryContext(ctx, d.Timeout(schema.TimeoutCreate), func() *resource.RetryError {
+		err = retry.RetryContext(ctx, d.Timeout(schema.TimeoutCreate), func() *retry.RetryError {
 			_, err := conn.CoreV1().ServiceAccounts(out.Name).Get(ctx, "default", metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
 					log.Printf("[INFO] Default service account does not exist, will retry: %s", metadata.Namespace)
-					return resource.RetryableError(err)
+					return retry.RetryableError(err)
 				}
 
-				return resource.NonRetryableError(err)
+				return retry.NonRetryableError(err)
 			}
 
 			log.Printf("[INFO] Default service account exists: %s", metadata.Namespace)
@@ -108,6 +111,11 @@ func resourceKubernetesNamespaceV1Read(ctx context.Context, d *schema.ResourceDa
 	}
 	log.Printf("[INFO] Received namespace: %#v", namespace)
 	err = d.Set("metadata", flattenMetadata(namespace.ObjectMeta, d, meta))
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	err = setResourceIdentityNonNamespaced(d, "v1", "Namespace", name)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -154,7 +162,7 @@ func resourceKubernetesNamespaceV1Delete(ctx context.Context, d *schema.Resource
 		return diag.FromErr(err)
 	}
 
-	stateConf := &resource.StateChangeConf{
+	stateConf := &retry.StateChangeConf{
 		Target:  []string{},
 		Pending: []string{"Terminating"},
 		Timeout: d.Timeout(schema.TimeoutDelete),

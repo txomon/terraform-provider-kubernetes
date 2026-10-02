@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -25,6 +25,7 @@ var (
 	networkPolicyV1EgressRulePortsDoc       = networking.NetworkPolicyEgressRule{}.SwaggerDoc()["ports"]
 	networkPolicyV1EgressRuleToDoc          = networking.NetworkPolicyEgressRule{}.SwaggerDoc()["to"]
 	networkPolicyV1PortPortDoc              = networking.NetworkPolicyPort{}.SwaggerDoc()["port"]
+	networkPolicyV1PortEndPortDoc           = networking.NetworkPolicyPort{}.SwaggerDoc()["endPort"]
 	networkPolicyV1PortProtocolDoc          = networking.NetworkPolicyPort{}.SwaggerDoc()["protocol"]
 	networkPolicyV1PeerIpBlockDoc           = networking.NetworkPolicyPeer{}.SwaggerDoc()["ipBlock"]
 	ipBlockCidrDoc                          = networking.IPBlock{}.SwaggerDoc()["cidr"]
@@ -35,16 +36,18 @@ var (
 	networkPolicyV1SpecPolicyTypesDoc       = networking.NetworkPolicySpec{}.SwaggerDoc()["policyTypes"]
 )
 
-func resourceKubernetesNetworkPolicyV1() *schema.Resource {
+func resourceKubernetesNetworkPolicyV1(deprecationMessage string) *schema.Resource {
 	return &schema.Resource{
-		CreateContext: resourceKubernetesNetworkPolicyV1Create,
-		ReadContext:   resourceKubernetesNetworkPolicyV1Read,
-		UpdateContext: resourceKubernetesNetworkPolicyV1Update,
-		DeleteContext: resourceKubernetesNetworkPolicyV1Delete,
+		Description:        "Kubernetes supports network policies to specify how groups of pods are allowed to communicate with each other and with other network endpoints. NetworkPolicy resources use labels to select pods and define rules which specify what traffic is allowed to the selected pods. Read more about network policies at https://kubernetes.io/docs/concepts/services-networking/network-policies/",
+		CreateContext:      resourceKubernetesNetworkPolicyV1Create,
+		ReadContext:        resourceKubernetesNetworkPolicyV1Read,
+		DeprecationMessage: deprecationMessage,
+		UpdateContext:      resourceKubernetesNetworkPolicyV1Update,
+		DeleteContext:      resourceKubernetesNetworkPolicyV1Delete,
 		Importer: &schema.ResourceImporter{
-			StateContext: schema.ImportStatePassthroughContext,
+			StateContext: resourceIdentityImportNamespaced,
 		},
-
+		Identity: resourceIdentitySchemaNamespaced(),
 		Schema: map[string]*schema.Schema{
 			"metadata": namespacedMetadataSchema("network policy", true),
 			"spec": {
@@ -69,6 +72,11 @@ func resourceKubernetesNetworkPolicyV1() *schema.Resource {
 												"port": {
 													Type:        schema.TypeString,
 													Description: networkPolicyV1PortPortDoc,
+													Optional:    true,
+												},
+												"end_port": {
+													Type:        schema.TypeInt,
+													Description: networkPolicyV1PortEndPortDoc,
 													Optional:    true,
 												},
 												"protocol": {
@@ -146,6 +154,11 @@ func resourceKubernetesNetworkPolicyV1() *schema.Resource {
 												"port": {
 													Type:        schema.TypeString,
 													Description: networkPolicyV1PortPortDoc,
+													Optional:    true,
+												},
+												"end_port": {
+													Type:        schema.TypeInt,
+													Description: networkPolicyV1PortEndPortDoc,
 													Optional:    true,
 												},
 												"protocol": {
@@ -260,7 +273,7 @@ func resourceKubernetesNetworkPolicyV1Create(ctx context.Context, d *schema.Reso
 	}
 
 	log.Printf("[INFO] Submitted new network policy: %#v", out)
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 
 	return resourceKubernetesNetworkPolicyV1Read(ctx, d, meta)
 }
@@ -279,7 +292,7 @@ func resourceKubernetesNetworkPolicyV1Read(ctx context.Context, d *schema.Resour
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -301,7 +314,10 @@ func resourceKubernetesNetworkPolicyV1Read(ctx context.Context, d *schema.Resour
 	if err != nil {
 		return diag.FromErr(err)
 	}
-
+	err = setResourceIdentityNamespaced(d, "networking.k8s.io/v1", "NetworkPolicy", namespace, name)
+	if err != nil {
+		return diag.FromErr(err)
+	}
 	return nil
 }
 
@@ -311,7 +327,7 @@ func resourceKubernetesNetworkPolicyV1Update(ctx context.Context, d *schema.Reso
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -334,7 +350,7 @@ func resourceKubernetesNetworkPolicyV1Update(ctx context.Context, d *schema.Reso
 		return diag.Errorf("Failed to update network policy: %s", err)
 	}
 	log.Printf("[INFO] Submitted updated network policy: %#v", out)
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 
 	return resourceKubernetesNetworkPolicyV1Read(ctx, d, meta)
 }
@@ -345,7 +361,7 @@ func resourceKubernetesNetworkPolicyV1Delete(ctx context.Context, d *schema.Reso
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -369,7 +385,7 @@ func resourceKubernetesNetworkPolicyV1Exists(ctx context.Context, d *schema.Reso
 		return false, err
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return false, err
 	}

@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -6,6 +6,7 @@ package kubernetes
 import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
+	corev1 "k8s.io/api/core/v1"
 )
 
 func persistentVolumeClaimFields() map[string]*schema.Schema {
@@ -36,6 +37,7 @@ func persistentVolumeClaimSpecFields() map[string]*schema.Schema {
 					"ReadWriteOnce",
 					"ReadOnlyMany",
 					"ReadWriteMany",
+					"ReadWriteOncePod",
 				}, false),
 			},
 			Set: schema.HashString,
@@ -87,6 +89,17 @@ func persistentVolumeClaimSpecFields() map[string]*schema.Schema {
 			Optional:    true,
 			Computed:    true,
 			ForceNew:    true,
+		},
+		"volume_mode": {
+			Type:        schema.TypeString,
+			Description: "Defines what type of volume is required by the claim.",
+			Optional:    true,
+			Computed:    true,
+			ForceNew:    true,
+			ValidateFunc: validation.StringInSlice([]string{
+				string(corev1.PersistentVolumeBlock),
+				string(corev1.PersistentVolumeFilesystem),
+			}, false),
 		},
 	}
 }

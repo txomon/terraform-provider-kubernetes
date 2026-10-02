@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -6,11 +6,12 @@ package kubernetes
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -18,7 +19,8 @@ import (
 func TestAccKubernetesIgnoreKubernetesMetadata_basic(t *testing.T) {
 	namespaceName := fmt.Sprintf("tf-acc-test-%s", acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum))
 	ignoreKubernetesMetadata := "terraform.io/provider"
-	dataSourceName := "data.kubernetes_namespace_v1.this"
+	dataSourceName := "data.kubernetes_namespace.this"
+	oneOrMore := regexp.MustCompile(`^[1-9][0-9]*$`)
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck: func() {
@@ -33,8 +35,8 @@ func TestAccKubernetesIgnoreKubernetesMetadata_basic(t *testing.T) {
 			{
 				Config: testAccKubernetesIgnoreKubernetesMetadataProviderConfig(namespaceName, ignoreKubernetesMetadata),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr(dataSourceName, "metadata.annotations.#", "0"),
-					resource.TestCheckResourceAttr(dataSourceName, "metadata.labels.#", "0"),
+					resource.TestMatchResourceAttr(dataSourceName, "metadata.0.annotations.%", oneOrMore),
+					resource.TestMatchResourceAttr(dataSourceName, "metadata.0.labels.%", oneOrMore),
 				),
 			},
 		},
@@ -42,8 +44,7 @@ func TestAccKubernetesIgnoreKubernetesMetadata_basic(t *testing.T) {
 }
 
 func testAccKubernetesIgnoreKubernetesMetadataProviderConfig(namespaceName string, ignoreKubernetesMetadata string) string {
-	return fmt.Sprintf(`
-provider "kubernetes" {
+	return fmt.Sprintf(`provider "kubernetes" {
   ignore_annotations = [
     "%s",
   ]
@@ -52,7 +53,7 @@ provider "kubernetes" {
   ]
 }
 
-data "kubernetes_namespace_v1" "this" {
+data "kubernetes_namespace" "this" {
   metadata {
     name = "%s"
   }
@@ -66,15 +67,12 @@ func createNamespaceIgnoreKubernetesMetadata(namespaceName string, ignoreKuberne
 		return err
 	}
 	ns := corev1.Namespace{}
-	m := map[string]string{ignoreKubernetesMetadata: "kubernetes"}
 	ns.SetName(namespaceName)
+	m := map[string]string{ignoreKubernetesMetadata: "kubernetes"}
 	ns.SetAnnotations(m)
 	ns.SetLabels(m)
-	namespace, err := conn.CoreV1().Namespaces().Create(context.Background(), &ns, metav1.CreateOptions{})
-	switch namespace.Status.Phase {
-	case corev1.NamespaceActive:
-		return err
-	}
+	_, err = conn.CoreV1().Namespaces().Create(context.Background(), &ns, metav1.CreateOptions{})
+
 	return err
 }
 

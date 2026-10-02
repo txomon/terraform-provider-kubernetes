@@ -1,3 +1,0 @@
-```release-note:bug
-Fix issue when `kubernetes_manifest` resources would get replaced if there was a change in an attribute marked with `x-kubernetes-preserve-unknown` regardless of immutability
-```

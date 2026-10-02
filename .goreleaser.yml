@@ -1,8 +1,10 @@
+version: 2
 archives:
   - files:
       # Ensure only built binary is archived
       - 'none*'
-    format: zip
+    formats:
+      - zip
     name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
 before:
   hooks:
@@ -23,18 +25,30 @@ builds:
       - amd64
       - arm
       - arm64
+      - s390x
+    # Same platform matrix as upstream's .github/workflows/build.yml
     ignore:
+      - goarch: '386'
+        goos: darwin
+      - goarch: arm
+        goos: darwin
+      - goarch: s390x
+        goos: darwin
+      - goarch: arm64
+        goos: freebsd
+      - goarch: s390x
+        goos: freebsd
       - goarch: arm
         goos: windows
       - goarch: arm64
-        goos: freebsd
-      - goarch: arm64
+        goos: windows
+      - goarch: s390x
         goos: windows
     ldflags:
-      - '-s -w -X main.version={{.Version}} -X main.commit={{.Commit}}'
+      - '-s -w -X main.Version={{.Version}}'
     mod_timestamp: '{{ .CommitTimestamp }}'
 changelog:
-  skip: true
+  disable: true
 checksum:
   algorithm: sha256
   extra_files:

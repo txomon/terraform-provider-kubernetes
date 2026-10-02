@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -19,14 +19,16 @@ import (
 
 func resourceKubernetesHorizontalPodAutoscalerV2() *schema.Resource {
 	return &schema.Resource{
+		Description:   "Horizontal Pod Autoscaler automatically scales the number of pods in a replication controller, deployment or replica set based on observed CPU utilization.",
 		CreateContext: resourceKubernetesHorizontalPodAutoscalerV2Create,
 		ReadContext:   resourceKubernetesHorizontalPodAutoscalerV2Read,
 		UpdateContext: resourceKubernetesHorizontalPodAutoscalerV2Update,
 		DeleteContext: resourceKubernetesHorizontalPodAutoscalerV2Delete,
+		Schema:        horizontalPodAutoscalerSchemaV2(),
 		Importer: &schema.ResourceImporter{
-			StateContext: schema.ImportStatePassthroughContext,
+			StateContext: resourceIdentityImportNamespaced,
 		},
-		Schema: horizontalPodAutoscalerSchemaV2(),
+		Identity: resourceIdentitySchemaNamespaced(),
 	}
 }
 
@@ -53,7 +55,7 @@ func resourceKubernetesHorizontalPodAutoscalerV2Create(ctx context.Context, d *s
 	}
 
 	log.Printf("[INFO] Submitted new horizontal pod autoscaler: %#v", out)
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 
 	return resourceKubernetesHorizontalPodAutoscalerV2Read(ctx, d, meta)
 }
@@ -72,7 +74,7 @@ func resourceKubernetesHorizontalPodAutoscalerV2Read(ctx context.Context, d *sch
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -94,7 +96,10 @@ func resourceKubernetesHorizontalPodAutoscalerV2Read(ctx context.Context, d *sch
 	if err != nil {
 		return diag.FromErr(err)
 	}
-
+	err = setResourceIdentityNamespaced(d, "autoscaling/v2", "HorizontalPodAutoscaler", namespace, name)
+	if err != nil {
+		return diag.FromErr(err)
+	}
 	return nil
 }
 
@@ -104,7 +109,7 @@ func resourceKubernetesHorizontalPodAutoscalerV2Update(ctx context.Context, d *s
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -124,7 +129,7 @@ func resourceKubernetesHorizontalPodAutoscalerV2Update(ctx context.Context, d *s
 		return diag.Errorf("Failed to update horizontal pod autoscaler: %s", err)
 	}
 	log.Printf("[INFO] Submitted updated horizontal pod autoscaler: %#v", out)
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 
 	return resourceKubernetesHorizontalPodAutoscalerV2Read(ctx, d, meta)
 }
@@ -135,7 +140,7 @@ func resourceKubernetesHorizontalPodAutoscalerV2Delete(ctx context.Context, d *s
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -160,7 +165,7 @@ func resourceKubernetesHorizontalPodAutoscalerV2Exists(ctx context.Context, d *s
 		return false, err
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return false, err
 	}

@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
 func TestAccKubernetesDataSourceServiceV1_basic(t *testing.T) {
@@ -83,6 +83,76 @@ func TestAccKubernetesDataSourceServiceV1_basic(t *testing.T) {
 	})
 }
 
+func TestAccKubernetesDataSourceServiceV1_not_found(t *testing.T) {
+	dataSourceName := "data.kubernetes_service_v1.test"
+	name := fmt.Sprintf("ceci-n.est-pas-une-service-%s", acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum))
+
+	resource.ParallelTest(t, resource.TestCase{
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccKubernetesConfig_ignoreAnnotations() +
+					testAccKubernetesDataSourceServiceV1_nonexistent(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(dataSourceName, "metadata.0.name", name),
+					resource.TestCheckResourceAttr(dataSourceName, "spec.#", "0"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccKubernetesDataSourceServiceV1_loadBalancer_ipMode(t *testing.T) {
+	name := acctest.RandomWithPrefix("tf-acc-test")
+	datasourceName := "data.kubernetes_service_v1.test"
+
+	resource.ParallelTest(t, resource.TestCase{
+		PreCheck:          func() { testAccPreCheck(t); skipIfNoLoadBalancersAvailable(t) },
+		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckKubernetesServiceV1Destroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccKubernetesConfig_ignoreAnnotations() +
+					testAccKubernetesDataSourceServiceV1Config_loadBalancer_ipMode(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(datasourceName, "metadata.0.name", name),
+					resource.TestCheckResourceAttr(datasourceName, "status.0.load_balancer.0.ingress.0.ip_mode", ""),
+				),
+			},
+		},
+	})
+}
+
+func testAccKubernetesDataSourceServiceV1Config_loadBalancer_ipMode(name string) string {
+	return fmt.Sprintf(`
+resource "kubernetes_service_v1" "test" {
+  metadata {
+    name = "%s"
+  }
+  spec {
+    type = "LoadBalancer"
+    selector = {
+      app = "test-app"
+    }
+    port {
+      port        = 80
+      target_port = 80
+    }
+  }
+
+  wait_for_load_balancer = true
+}
+
+data "kubernetes_service_v1" "test" {
+  metadata {
+    name = "${kubernetes_service_v1.test.metadata.0.name}"
+  }
+}
+`, name)
+}
+
 func testAccKubernetesDataSourceServiceV1_basic(name string) string {
 	return fmt.Sprintf(`resource "kubernetes_service_v1" "test" {
   metadata {
@@ -117,4 +187,13 @@ func testAccKubernetesDataSourceServiceV1_read() string {
   }
 }
 `
+}
+
+func testAccKubernetesDataSourceServiceV1_nonexistent(name string) string {
+	return fmt.Sprintf(`data "kubernetes_service_v1" "test" {
+  metadata {
+    name = "%s"
+  }
+}
+`, name)
 }

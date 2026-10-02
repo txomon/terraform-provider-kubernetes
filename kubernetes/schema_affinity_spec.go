@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -161,6 +161,14 @@ func podAffinityTermFields() map[string]*schema.Schema {
 		"label_selector": {
 			Type:        schema.TypeList,
 			Description: "A label query over a set of resources, in this case pods.",
+			Optional:    true,
+			Elem: &schema.Resource{
+				Schema: labelSelectorFields(true),
+			},
+		},
+		"namespace_selector": {
+			Type:        schema.TypeList,
+			Description: "A label query over a set of namespaces that matches the namespaceSelector in Kubernetes.",
 			Optional:    true,
 			Elem: &schema.Resource{
 				Schema: labelSelectorFields(true),

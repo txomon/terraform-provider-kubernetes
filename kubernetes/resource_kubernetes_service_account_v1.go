@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 
 	corev1 "k8s.io/api/core/v1"
@@ -19,22 +19,24 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgApi "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/utils/ptr"
 )
 
-func resourceKubernetesServiceAccountV1() *schema.Resource {
+func resourceKubernetesServiceAccountV1(deprecationMessage string) *schema.Resource {
 	return &schema.Resource{
-		CreateContext: resourceKubernetesServiceAccountV1Create,
-		ReadContext:   resourceKubernetesServiceAccountV1Read,
-		UpdateContext: resourceKubernetesServiceAccountV1Update,
-		DeleteContext: resourceKubernetesServiceAccountV1Delete,
+		Description:        "A service account provides an identity for processes that run in a Pod. More info: https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/.",
+		CreateContext:      resourceKubernetesServiceAccountV1Create,
+		ReadContext:        resourceKubernetesServiceAccountV1Read,
+		DeprecationMessage: deprecationMessage,
+		UpdateContext:      resourceKubernetesServiceAccountV1Update,
+		DeleteContext:      resourceKubernetesServiceAccountV1Delete,
 		Importer: &schema.ResourceImporter{
 			StateContext: resourceKubernetesServiceAccountV1ImportState,
 		},
-
+		Identity: resourceIdentitySchemaNamespaced(),
 		Timeouts: &schema.ResourceTimeout{
 			Create: schema.DefaultTimeout(30 * time.Second),
 		},
-
 		Schema: map[string]*schema.Schema{
 			"metadata": namespacedMetadataSchema("service account", true),
 			"image_pull_secret": {
@@ -88,7 +90,7 @@ func resourceKubernetesServiceAccountV1Create(ctx context.Context, d *schema.Res
 
 	metadata := expandMetadata(d.Get("metadata").([]interface{}))
 	svcAcc := corev1.ServiceAccount{
-		AutomountServiceAccountToken: ptrToBool(d.Get("automount_service_account_token").(bool)),
+		AutomountServiceAccountToken: ptr.To(d.Get("automount_service_account_token").(bool)),
 		ObjectMeta:                   metadata,
 		ImagePullSecrets:             expandLocalObjectReferenceArray(d.Get("image_pull_secret").(*schema.Set).List()),
 		Secrets:                      expandServiceAccountSecrets(d.Get("secret").(*schema.Set).List(), ""),
@@ -99,7 +101,7 @@ func resourceKubernetesServiceAccountV1Create(ctx context.Context, d *schema.Res
 		return diag.FromErr(err)
 	}
 	log.Printf("[INFO] Submitted new service account: %#v", out)
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 
 	secret, err := getServiceAccountDefaultSecretV1(ctx, out.Name, svcAcc, d.Timeout(schema.TimeoutCreate), conn)
 	if err != nil {
@@ -124,15 +126,15 @@ func getServiceAccountDefaultSecretV1(ctx context.Context, name string, config c
 	}
 
 	var svcAccTokens []corev1.Secret
-	err = resource.RetryContext(ctx, timeout, func() *resource.RetryError {
+	err = retry.RetryContext(ctx, timeout, func() *retry.RetryError {
 		resp, err := conn.CoreV1().ServiceAccounts(config.Namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
-			return resource.NonRetryableError(err)
+			return retry.NonRetryableError(err)
 		}
 
 		if len(resp.Secrets) == len(config.Secrets) {
 			log.Printf("[DEBUG] Configuration contains %d secrets, saw %d, expected %d", len(config.Secrets), len(resp.Secrets), len(config.Secrets)+1)
-			return resource.RetryableError(fmt.Errorf("Waiting for default secret of %q to appear", buildId(resp.ObjectMeta)))
+			return retry.RetryableError(fmt.Errorf("Waiting for default secret of %q to appear", BuildId(resp.ObjectMeta)))
 		}
 
 		diff := diffObjectReferences(config.Secrets, resp.Secrets)
@@ -140,7 +142,7 @@ func getServiceAccountDefaultSecretV1(ctx context.Context, name string, config c
 			FieldSelector: fmt.Sprintf("type=%s", corev1.SecretTypeServiceAccountToken),
 		})
 		if err != nil {
-			return resource.NonRetryableError(err)
+			return retry.NonRetryableError(err)
 		}
 
 		for _, secret := range secretList.Items {
@@ -153,11 +155,11 @@ func getServiceAccountDefaultSecretV1(ctx context.Context, name string, config c
 		}
 
 		if len(svcAccTokens) == 0 {
-			return resource.RetryableError(fmt.Errorf("Expected 1 generated service account token, %d found", len(svcAccTokens)))
+			return retry.RetryableError(fmt.Errorf("Expected 1 generated service account token, %d found", len(svcAccTokens)))
 		}
 
 		if len(svcAccTokens) > 1 {
-			return resource.NonRetryableError(fmt.Errorf("Expected 1 generated service account token, %d found: %s", len(svcAccTokens), err))
+			return retry.NonRetryableError(fmt.Errorf("Expected 1 generated service account token, %d found: %s", len(svcAccTokens), err))
 		}
 
 		return nil
@@ -263,7 +265,7 @@ func resourceKubernetesServiceAccountV1Read(ctx context.Context, d *schema.Resou
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -305,6 +307,11 @@ func resourceKubernetesServiceAccountV1Read(ctx context.Context, d *schema.Resou
 		return diag.FromErr(err)
 	}
 
+	err = setResourceIdentityNamespaced(d, "v1", "ServiceAccount", namespace, name)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
 	return nil
 }
 
@@ -314,7 +321,7 @@ func resourceKubernetesServiceAccountV1Update(ctx context.Context, d *schema.Res
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -353,7 +360,7 @@ func resourceKubernetesServiceAccountV1Update(ctx context.Context, d *schema.Res
 		return diag.Errorf("Failed to update service account: %s", err)
 	}
 	log.Printf("[INFO] Submitted updated service account: %#v", out)
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 
 	return resourceKubernetesServiceAccountV1Read(ctx, d, meta)
 }
@@ -364,7 +371,7 @@ func resourceKubernetesServiceAccountV1Delete(ctx context.Context, d *schema.Res
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -390,7 +397,7 @@ func resourceKubernetesServiceAccountV1Exists(ctx context.Context, d *schema.Res
 		return false, err
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return false, err
 	}
@@ -412,14 +419,32 @@ func resourceKubernetesServiceAccountV1ImportState(ctx context.Context, d *schem
 		return nil, err
 	}
 
-	namespace, name, err := idParts(d.Id())
-	if err != nil {
-		return nil, fmt.Errorf("Unable to parse identifier %s: %s", d.Id(), err)
+	var namespace, name string
+	if d.Id() != "" {
+		namespace, name, err = IdParts(d.Id())
+		if err != nil {
+			return nil, fmt.Errorf("Unable to parse identifier %s: %s", d.Id(), err)
+		}
+	} else {
+		rid, err := d.Identity()
+		if err != nil {
+			return nil, err
+		}
+		var ok bool
+		namespace, ok = rid.Get("namespace").(string)
+		if !ok {
+			return nil, fmt.Errorf("could not get namespace from resource identity")
+		}
+		name, ok = rid.Get("name").(string)
+		if !ok {
+			return nil, fmt.Errorf("could not get name from resource identity")
+		}
+
 	}
 
 	sa, err := conn.CoreV1().ServiceAccounts(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("Unable to fetch service account from Kubernetes: %s", err)
+		return nil, fmt.Errorf(`Unable to fetch service account "%s/%s" from Kubernetes: %s`, namespace, name, err)
 	}
 
 	defaultSecret, diagMsg := findDefaultServiceAccountV1(ctx, sa, conn)
@@ -432,7 +457,7 @@ func resourceKubernetesServiceAccountV1ImportState(ctx context.Context, d *schem
 		return nil, fmt.Errorf("Unable to set default_secret_name: %s", err)
 	}
 
-	d.SetId(buildId(sa.ObjectMeta))
+	d.SetId(BuildId(sa.ObjectMeta))
 
 	return []*schema.ResourceData{d}, nil
 }

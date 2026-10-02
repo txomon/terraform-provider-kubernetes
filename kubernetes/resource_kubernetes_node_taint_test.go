@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/util/taints"
@@ -23,14 +23,12 @@ const (
 	taintEffect  = "PreferNoSchedule"
 )
 
-//Due to the nature of this resource it will not be modified to run in parallel
-
+// Due to the nature of this resource it will not be modified to run in parallel
 func TestAccKubernetesResourceNodeTaint_basic(t *testing.T) {
 	resourceName := "kubernetes_node_taint.test"
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccKubernetesNodeTaintDestroy,
 		Steps: []resource.TestStep{
@@ -54,7 +52,6 @@ func TestAccKubernetesResourceNodeTaint_MultipleBasic(t *testing.T) {
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccKubernetesNodeTaintDestroy,
 		Steps: []resource.TestStep{
@@ -155,8 +152,7 @@ func testAccKubernetesNodeTaintExists(n string) resource.TestCheckFunc {
 }
 
 func testAccKubernetesNodeTaintConfig_basic() string {
-	return fmt.Sprintf(`
-data "kubernetes_nodes" "test" {}
+	return fmt.Sprintf(`data "kubernetes_nodes" "test" {}
 
 resource "kubernetes_node_taint" "test" {
   metadata {
@@ -168,13 +164,13 @@ resource "kubernetes_node_taint" "test" {
     effect = %q
   }
   field_manager = %q
+  force         = true
 }
 `, taintKey, taintValue, taintEffect, fieldManager)
 }
 
 func testAccKubernetesNodeTaintConfig_multipleBasic() string {
-	return fmt.Sprintf(`
-data "kubernetes_nodes" "test" {}
+	return fmt.Sprintf(`data "kubernetes_nodes" "test" {}
 
 resource "kubernetes_node_taint" "test" {
   metadata {
@@ -196,13 +192,13 @@ resource "kubernetes_node_taint" "test" {
     effect = %q
   }
   field_manager = %q
+  force         = true
 }
 `, taintKey+"-1", taintValue, taintEffect, taintKey+"-2", taintValue, taintEffect, taintKey+"-3", taintValue, taintEffect, fieldManager)
 }
 
 func testAccKubernetesNodeTaintConfig_updateTaint() string {
-	return fmt.Sprintf(`
-data "kubernetes_nodes" "test" {}
+	return fmt.Sprintf(`data "kubernetes_nodes" "test" {}
 
 resource "kubernetes_node_taint" "test" {
   metadata {
@@ -229,8 +225,7 @@ resource "kubernetes_node_taint" "test" {
 }
 
 func testAccKubernetesNodeTaintConfig_removeTaint() string {
-	return fmt.Sprintf(`
-data "kubernetes_nodes" "test" {}
+	return fmt.Sprintf(`data "kubernetes_nodes" "test" {}
 
 resource "kubernetes_node_taint" "test" {
   metadata {

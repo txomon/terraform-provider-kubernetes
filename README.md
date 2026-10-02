@@ -8,8 +8,11 @@ This provider is a patched one when compared to the official terraform provider.
 
 All the patches can be found separately in branches:
 
-* `fix-replacement` Supresses forced replacement on attributes annotated with `x-kubernetes-preserve-unknown-fields`, https://github.com/hashicorp/terraform-provider-kubernetes/issues/1893
 * `fix-strict-lists` Fixes errors raised for incompatible Tuples `AttributeName("name"): can't use tftypes.Tuple[...] as tftypes.Tuple[...]` because of subitems having object attributes with no fields but annotated with `x-kubernetes-preserve-unknown-fields`, https://github.com/txomon/terraform-provider-kubernetes/issues/1
+
+Patches no longer carried because upstream fixed them:
+
+* `fix-replacement` Supressed forced replacement on attributes annotated with `x-kubernetes-preserve-unknown-fields`, https://github.com/hashicorp/terraform-provider-kubernetes/issues/1893. Fixed upstream in v2.33.0 by https://github.com/hashicorp/terraform-provider-kubernetes/pull/2437
 
 
 Other branches:

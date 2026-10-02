@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -9,13 +9,16 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	v1 "k8s.io/api/core/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func dataSourceKubernetesNamespaceV1() *schema.Resource {
+func dataSourceKubernetesNamespaceV1(deprecationMessage string) *schema.Resource {
 	return &schema.Resource{
-		ReadContext: dataSourceKubernetesNamespaceV1Read,
+		Description:        "This data source provides a mechanism to query attributes of any specific namespace within a Kubernetes cluster. In Kubernetes, namespaces provide a scope for names and are intended as a way to divide cluster resources between multiple users.",
+		ReadContext:        dataSourceKubernetesNamespaceV1Read,
+		DeprecationMessage: deprecationMessage,
 
 		Schema: map[string]*schema.Schema{
 			"metadata": metadataSchema("namespace", false),
@@ -49,24 +52,30 @@ func dataSourceKubernetesNamespaceV1Read(ctx context.Context, d *schema.Resource
 	metadata := expandMetadata(d.Get("metadata").([]interface{}))
 	d.SetId(metadata.Name)
 
-	namespace, err := conn.CoreV1().Namespaces().Get(ctx, metadata.Name, meta_v1.GetOptions{})
+	namespace, err := conn.CoreV1().Namespaces().Get(ctx, metadata.Name, metav1.GetOptions{})
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
 		log.Printf("[DEBUG] Received error: %#v", err)
 		return diag.FromErr(err)
 	}
 	log.Printf("[INFO] Received namespace: %#v", namespace)
-	err = d.Set("metadata", flattenMetadata(namespace.ObjectMeta, d, meta))
+
+	err = d.Set("metadata", flattenMetadataFields(namespace.ObjectMeta))
 	if err != nil {
 		return diag.FromErr(err)
 	}
-	err = d.Set("spec", flattenNamespaceSpec(&namespace.Spec))
+
+	err = d.Set("spec", flattenNamespaceV1Spec(&namespace.Spec))
 	if err != nil {
 		return diag.FromErr(err)
 	}
+
 	return nil
 }
 
-func flattenNamespaceSpec(in *v1.NamespaceSpec) []interface{} {
+func flattenNamespaceV1Spec(in *corev1.NamespaceSpec) []interface{} {
 	if in == nil || len(in.Finalizers) == 0 {
 		return []interface{}{}
 	}
@@ -76,5 +85,6 @@ func flattenNamespaceSpec(in *v1.NamespaceSpec) []interface{} {
 		fin[i] = string(f)
 	}
 	spec["finalizers"] = fin
+
 	return []interface{}{spec}
 }

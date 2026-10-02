@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -11,7 +11,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 	corev1 "k8s.io/api/core/v1"
@@ -20,15 +20,18 @@ import (
 	pkgApi "k8s.io/apimachinery/pkg/types"
 )
 
-func resourceKubernetesPodV1() *schema.Resource {
+func resourceKubernetesPodV1(deprecationMessage string) *schema.Resource {
 	return &schema.Resource{
-		CreateContext: resourceKubernetesPodV1Create,
-		ReadContext:   resourceKubernetesPodV1Read,
-		UpdateContext: resourceKubernetesPodV1Update,
-		DeleteContext: resourceKubernetesPodV1Delete,
+		Description:        "A pod is a group of one or more containers, the shared storage for those containers, and options about how to run the containers. Pods are always co-located and co-scheduled, and run in a shared context. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod/.",
+		CreateContext:      resourceKubernetesPodV1Create,
+		ReadContext:        resourceKubernetesPodV1Read,
+		DeprecationMessage: deprecationMessage,
+		UpdateContext:      resourceKubernetesPodV1Update,
+		DeleteContext:      resourceKubernetesPodV1Delete,
 		Importer: &schema.ResourceImporter{
-			StateContext: schema.ImportStatePassthroughContext,
+			StateContext: resourceIdentityImportNamespaced,
 		},
+		Identity: resourceIdentitySchemaNamespaced(),
 		StateUpgraders: []schema.StateUpgrader{
 			{
 				Version: 0,
@@ -95,15 +98,14 @@ func resourceKubernetesPodV1Create(ctx context.Context, d *schema.ResourceData, 
 
 	log.Printf("[INFO] Creating new pod: %#v", pod)
 	out, err := conn.CoreV1().Pods(metadata.Namespace).Create(ctx, &pod, metav1.CreateOptions{})
-
 	if err != nil {
 		return diag.FromErr(err)
 	}
 	log.Printf("[INFO] Submitted new pod: %#v", out)
 
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 
-	stateConf := &resource.StateChangeConf{
+	stateConf := &retry.StateChangeConf{
 		Target:  expandPodTargetState(d.Get("target_state").([]interface{})),
 		Pending: []string{string(corev1.PodPending)},
 		Timeout: d.Timeout(schema.TimeoutCreate),
@@ -138,7 +140,7 @@ func resourceKubernetesPodV1Update(ctx context.Context, d *schema.ResourceData, 
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -164,7 +166,7 @@ func resourceKubernetesPodV1Update(ctx context.Context, d *schema.ResourceData, 
 	}
 	log.Printf("[INFO] Submitted updated pod: %#v", out)
 
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 	return resourceKubernetesPodV1Read(ctx, d, meta)
 }
 
@@ -182,7 +184,7 @@ func resourceKubernetesPodV1Read(ctx context.Context, d *schema.ResourceData, me
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -200,7 +202,7 @@ func resourceKubernetesPodV1Read(ctx context.Context, d *schema.ResourceData, me
 		return diag.FromErr(err)
 	}
 
-	podSpec, err := flattenPodSpec(pod.Spec)
+	podSpec, err := flattenPodSpec(pod.Spec, false)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -209,8 +211,12 @@ func resourceKubernetesPodV1Read(ctx context.Context, d *schema.ResourceData, me
 	if err != nil {
 		return diag.FromErr(err)
 	}
-	return nil
 
+	err = setResourceIdentityNamespaced(d, "v1", "Pod", namespace, name)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	return nil
 }
 
 func resourceKubernetesPodV1Delete(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
@@ -219,7 +225,7 @@ func resourceKubernetesPodV1Delete(ctx context.Context, d *schema.ResourceData, 
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -233,18 +239,18 @@ func resourceKubernetesPodV1Delete(ctx context.Context, d *schema.ResourceData, 
 		return diag.FromErr(err)
 	}
 
-	err = resource.RetryContext(ctx, d.Timeout(schema.TimeoutDelete), func() *resource.RetryError {
+	err = retry.RetryContext(ctx, d.Timeout(schema.TimeoutDelete), func() *retry.RetryError {
 		out, err := conn.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			if statusErr, ok := err.(*errors.StatusError); ok && errors.IsNotFound(statusErr) {
 				return nil
 			}
-			return resource.NonRetryableError(err)
+			return retry.NonRetryableError(err)
 		}
 
 		log.Printf("[DEBUG] Current state of pod: %#v", out.Status.Phase)
 		e := fmt.Errorf("Pod %s still exists (%s)", name, out.Status.Phase)
-		return resource.RetryableError(e)
+		return retry.RetryableError(e)
 	})
 	if err != nil {
 		return diag.FromErr(err)
@@ -262,7 +268,7 @@ func resourceKubernetesPodV1Exists(ctx context.Context, d *schema.ResourceData, 
 		return false, err
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return false, err
 	}

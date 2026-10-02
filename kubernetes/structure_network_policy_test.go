@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -83,7 +83,7 @@ func TestExpandNetworkPolicyIngressPorts(t *testing.T) {
 
 	cases := []struct {
 		Input          []interface{}
-		ExpectedOutput []networkingv1.NetworkPolicyPort
+		ExpectedOutput *[]networkingv1.NetworkPolicyPort
 	}{
 		{
 			[]interface{}{
@@ -92,7 +92,7 @@ func TestExpandNetworkPolicyIngressPorts(t *testing.T) {
 					"protocol": "TCP",
 				},
 			},
-			[]networkingv1.NetworkPolicyPort{{
+			&[]networkingv1.NetworkPolicyPort{{
 				Port:     &portName,
 				Protocol: &protoTCP,
 			}},
@@ -103,7 +103,7 @@ func TestExpandNetworkPolicyIngressPorts(t *testing.T) {
 					"port": "http",
 				},
 			},
-			[]networkingv1.NetworkPolicyPort{{
+			&[]networkingv1.NetworkPolicyPort{{
 				Port: &portName,
 			}},
 		},
@@ -114,24 +114,24 @@ func TestExpandNetworkPolicyIngressPorts(t *testing.T) {
 					"protocol": "UDP",
 				},
 			},
-			[]networkingv1.NetworkPolicyPort{{
+			&[]networkingv1.NetworkPolicyPort{{
 				Port:     &portNumerical,
 				Protocol: &protoUDP,
 			}},
 		},
 		{
 			[]interface{}{map[string]interface{}{}},
-			[]networkingv1.NetworkPolicyPort{{}},
+			&[]networkingv1.NetworkPolicyPort{{}},
 		},
 		{
 			[]interface{}{},
-			[]networkingv1.NetworkPolicyPort{},
+			&[]networkingv1.NetworkPolicyPort{},
 		},
 	}
 
 	for _, tc := range cases {
-		output, _ := expandNetworkPolicyV1Ports(tc.Input)
-		if !reflect.DeepEqual(output, &tc.ExpectedOutput) {
+		output := expandNetworkPolicyV1Ports(tc.Input)
+		if !reflect.DeepEqual(output, tc.ExpectedOutput) {
 			t.Fatalf("Unexpected output from flattener.\nExpected: %#v\nGiven:    %#v",
 				tc.ExpectedOutput, output)
 		}

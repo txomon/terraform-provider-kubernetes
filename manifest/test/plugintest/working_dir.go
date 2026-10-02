@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package plugintest
@@ -8,9 +8,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/hashicorp/go-version"
 
 	"github.com/hashicorp/terraform-exec/tfexec"
 	tfjson "github.com/hashicorp/terraform-json"
@@ -36,9 +38,6 @@ type WorkingDir struct {
 	// configFilename is the full filename where the latest configuration
 	// was stored; empty until SetConfig is called.
 	configFilename string
-
-	// baseArgs is arguments that should be appended to all commands
-	baseArgs []string
 
 	// tf is the instance of tfexec.Terraform used for running Terraform commands
 	tf *tfexec.Terraform
@@ -87,7 +86,7 @@ func (wd *WorkingDir) SetConfig(ctx context.Context, cfg string) error {
 	if err := os.Remove(rmFilename); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("unable to remove %q: %w", rmFilename, err)
 	}
-	err := ioutil.WriteFile(outFilename, bCfg, 0700)
+	err := os.WriteFile(outFilename, bCfg, 0o700)
 	if err != nil {
 		return err
 	}
@@ -266,7 +265,7 @@ func (wd *WorkingDir) SavedPlanRawStdout(ctx context.Context) (string, error) {
 	var ret bytes.Buffer
 
 	wd.tf.SetStdout(&ret)
-	defer wd.tf.SetStdout(ioutil.Discard)
+	defer wd.tf.SetStdout(io.Discard)
 
 	logging.HelperResourceTrace(ctx, "Calling Terraform CLI show command")
 
@@ -328,4 +327,17 @@ func (wd *WorkingDir) Schemas(ctx context.Context) (*tfjson.ProviderSchemas, err
 	logging.HelperResourceTrace(ctx, "Called Terraform CLI providers schema command")
 
 	return providerSchemas, err
+}
+
+// Version returns the current version of Terraform
+//
+// If the version cannot be read, Version returns an error.
+func (wd *WorkingDir) Version(ctx context.Context) (*version.Version, error) {
+	logging.HelperResourceTrace(ctx, "Calling Terraform CLI providers version command")
+
+	version, _, err := wd.tf.Version(context.Background(), false)
+
+	logging.HelperResourceTrace(ctx, "Called Terraform CLI providers version command")
+
+	return version, err
 }

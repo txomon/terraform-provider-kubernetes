@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
 func TestAccKubernetesDataSourceStorageClassV1_minikube(t *testing.T) {
@@ -67,6 +67,26 @@ func TestAccKubernetesDataSourceStorageClassV1_minikube(t *testing.T) {
 					resource.TestCheckResourceAttr(dataSourceName, "mount_options.0", "bar"),
 					resource.TestCheckResourceAttr(dataSourceName, "parameters.%", "1"),
 					resource.TestCheckResourceAttr(dataSourceName, "parameters.type", "pd-ssd"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccKubernetesDataSourceStorageClassV1_not_found(t *testing.T) {
+	dataSourceName := "data.kubernetes_storage_class_v1.test"
+	name := fmt.Sprintf("ceci-n.est-pas-une-storage-class-%s", acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum))
+
+	resource.ParallelTest(t, resource.TestCase{
+		PreCheck:          func() { testAccPreCheck(t); skipIfNotRunningInKind(t) },
+		ProviderFactories: testAccProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccKubernetesDataSourceStorageClassV1_nonexistent(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(dataSourceName, "metadata.0.name", name),
+					resource.TestCheckResourceAttr(dataSourceName, "mount_options.#", "0"),
+					resource.TestCheckResourceAttr(dataSourceName, "parameters.%", "0"),
 				),
 			},
 		},
@@ -177,4 +197,13 @@ func testAccKubernetesDataSourceStorageClassV1_read() string {
   }
 }
 `
+}
+
+func testAccKubernetesDataSourceStorageClassV1_nonexistent(name string) string {
+	return fmt.Sprintf(`data "kubernetes_storage_class_v1" "test" {
+  metadata {
+    name = "%s"
+  }
+}
+`, name)
 }

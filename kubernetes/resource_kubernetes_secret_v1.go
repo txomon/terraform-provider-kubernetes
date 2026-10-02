@@ -1,33 +1,40 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"log"
 	"time"
 
+	"github.com/hashicorp/go-cty/cty"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgApi "k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 )
 
-func resourceKubernetesSecretV1() *schema.Resource {
+func resourceKubernetesSecretV1(deprecationMessage string) *schema.Resource {
 	return &schema.Resource{
-		CreateContext: resourceKubernetesSecretV1Create,
-		ReadContext:   resourceKubernetesSecretV1Read,
-		UpdateContext: resourceKubernetesSecretV1Update,
-		DeleteContext: resourceKubernetesSecretV1Delete,
+		Description:        "The resource provides mechanisms to inject containers with sensitive information, such as passwords, while keeping containers agnostic of Kubernetes. Secrets can be used to store sensitive information either as individual properties or coarse-grained entries like entire files or JSON blobs. The resource will by default create a secret which is available to any pod in the specified (or default) namespace.",
+		CreateContext:      resourceKubernetesSecretV1Create,
+		ReadContext:        resourceKubernetesSecretV1Read,
+		DeprecationMessage: deprecationMessage,
+		UpdateContext:      resourceKubernetesSecretV1Update,
+		DeleteContext:      resourceKubernetesSecretV1Delete,
 		Importer: &schema.ResourceImporter{
-			StateContext: schema.ImportStatePassthroughContext,
+			StateContext: resourceIdentityImportNamespaced,
 		},
+		Identity: resourceIdentitySchemaNamespaced(),
 		CustomizeDiff: func(ctx context.Context, diff *schema.ResourceDiff, meta interface{}) error {
 			if diff.Id() == "" {
 				return nil
@@ -60,12 +67,49 @@ func resourceKubernetesSecretV1() *schema.Resource {
 				Optional:    true,
 				Computed:    true,
 				Sensitive:   true,
+				DiffSuppressFunc: func(k, oldValue, newValue string, d *schema.ResourceData) bool {
+					if v, ok := d.Get("binary_data_wo_revision").(int); ok && v > 0 {
+						return true
+					}
+					if v, ok := d.Get("data_wo_revision").(int); ok && v > 0 {
+						return true
+					}
+					return false
+				},
+			},
+			"data_wo_revision": {
+				Type:         schema.TypeInt,
+				Description:  `The current revision of the write-only "data_wo" attribute. Incrementing this integer value will cause Terraform to update the write-only value.`,
+				Optional:     true,
+				RequiredWith: []string{"data_wo"},
+				ValidateFunc: validation.IntAtLeast(1),
+			},
+			"data_wo": {
+				Type:          schema.TypeMap,
+				Description:   "A map write-only of the secret data.",
+				Optional:      true,
+				WriteOnly:     true,
+				ConflictsWith: []string{"data"},
 			},
 			"binary_data": {
 				Type:        schema.TypeMap,
 				Optional:    true,
 				Sensitive:   true,
 				Description: "A map of the secret data in base64 encoding. Use this for binary data.",
+			},
+			"binary_data_wo": {
+				Type:          schema.TypeMap,
+				Description:   "A write-only map of the secret data in base64 encoding. Use this for binary data.",
+				Optional:      true,
+				ConflictsWith: []string{"binary_data"},
+				WriteOnly:     true,
+			},
+			"binary_data_wo_revision": {
+				Type:         schema.TypeInt,
+				Description:  `The current revision of the write-only "binary_data_wo" attribute. Incrementing this integer value will cause Terraform to update the write-only value.`,
+				Optional:     true,
+				RequiredWith: []string{"binary_data_wo"},
+				ValidateFunc: validation.IntAtLeast(1),
 			},
 			"immutable": {
 				Type:        schema.TypeBool,
@@ -103,7 +147,15 @@ func resourceKubernetesSecretV1Create(ctx context.Context, d *schema.ResourceDat
 		ObjectMeta: metadata,
 	}
 
-	if v, ok := d.GetOk("data"); ok {
+	if datarev, ok := d.Get("data_wo_revision").(int); ok && datarev >= 1 {
+		wodata, diags := d.GetRawConfigAt(cty.GetAttrPath("data_wo"))
+		if diags.HasError() {
+			return diags
+		}
+		if wodata.IsWhollyKnown() && !wodata.IsNull() {
+			secret.StringData = expandCtyStringMap(wodata.AsValueMap())
+		}
+	} else if v, ok := d.GetOk("data"); ok {
 		m := map[string]string{}
 		for k, v := range v.(map[string]interface{}) {
 			vv := v.(string)
@@ -112,7 +164,15 @@ func resourceKubernetesSecretV1Create(ctx context.Context, d *schema.ResourceDat
 		secret.StringData = m
 	}
 
-	if v, ok := d.GetOk("binary_data"); ok {
+	if bindatarev, ok := d.Get("binary_data_wo_revision").(int); ok && bindatarev >= 1 {
+		wobindata, diags := d.GetRawConfigAt(cty.GetAttrPath("binary_data_wo"))
+		if diags.HasError() {
+			return diags
+		}
+		if wobindata.IsWhollyKnown() && !wobindata.IsNull() {
+			secret.Data = expandCtyBase64MapToByteMap(wobindata.AsValueMap())
+		}
+	} else if v, ok := d.GetOk("binary_data"); ok {
 		m, err := base64DecodeStringMap(v.(map[string]interface{}))
 		if err != nil {
 			return diag.FromErr(err)
@@ -124,8 +184,8 @@ func resourceKubernetesSecretV1Create(ctx context.Context, d *schema.ResourceDat
 		secret.Type = corev1.SecretType(v.(string))
 	}
 
-	if v, ok := d.GetOkExists("immutable"); ok {
-		secret.Immutable = ptrToBool(v.(bool))
+	if v, ok := d.GetOk("immutable"); ok {
+		secret.Immutable = ptr.To(v.(bool))
 	}
 
 	log.Printf("[INFO] Creating new secret: %#v", secret)
@@ -135,16 +195,16 @@ func resourceKubernetesSecretV1Create(ctx context.Context, d *schema.ResourceDat
 	}
 
 	log.Printf("[INFO] Submitting new secret: %#v", out)
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 
 	if out.Type == corev1.SecretTypeServiceAccountToken && d.Get("wait_for_service_account_token").(bool) {
 		log.Printf("[DEBUG] Waiting for secret service account token to be created")
 
-		err = resource.RetryContext(ctx, d.Timeout(schema.TimeoutCreate), func() *resource.RetryError {
+		err = retry.RetryContext(ctx, d.Timeout(schema.TimeoutCreate), func() *retry.RetryError {
 			secret, err := conn.CoreV1().Secrets(out.Namespace).Get(ctx, out.Name, metav1.GetOptions{})
 			if err != nil {
 				log.Printf("[DEBUG] Received error: %#v", err)
-				return resource.NonRetryableError(err)
+				return retry.NonRetryableError(err)
 			}
 
 			log.Printf("[INFO] Received secret: %#v", secret.Name)
@@ -153,7 +213,7 @@ func resourceKubernetesSecretV1Create(ctx context.Context, d *schema.ResourceDat
 				return nil
 			}
 
-			return resource.RetryableError(fmt.Errorf(
+			return retry.RetryableError(fmt.Errorf(
 				"Waiting for secret %q to create service account token", d.Id()))
 		})
 		if err != nil {
@@ -182,7 +242,7 @@ func resourceKubernetesSecretV1Read(ctx context.Context, d *schema.ResourceData,
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -199,6 +259,22 @@ func resourceKubernetesSecretV1Read(ctx context.Context, d *schema.ResourceData,
 		return diag.FromErr(err)
 	}
 
+	d.Set("type", secret.Type)
+	d.Set("immutable", secret.Immutable)
+
+	err = setResourceIdentityNamespaced(d, "v1", "Secret", namespace, name)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	// NOTE don't read data if write-only attributes are being used
+	if v, ok := d.Get("binary_data_wo_revision").(int); ok && v > 0 {
+		return nil
+	}
+	if v, ok := d.Get("data_wo_revision").(int); ok && v > 0 {
+		return nil
+	}
+
 	binaryDataKeys := []string{}
 	if v, ok := d.GetOk("binary_data"); ok {
 		binaryData := map[string][]byte{}
@@ -213,8 +289,6 @@ func resourceKubernetesSecretV1Read(ctx context.Context, d *schema.ResourceData,
 		delete(secret.Data, k)
 	}
 	d.Set("data", flattenByteMapToStringMap(secret.Data))
-	d.Set("type", secret.Type)
-	d.Set("immutable", secret.Immutable)
 
 	return nil
 }
@@ -225,7 +299,7 @@ func resourceKubernetesSecretV1Update(ctx context.Context, d *schema.ResourceDat
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -234,7 +308,20 @@ func resourceKubernetesSecretV1Update(ctx context.Context, d *schema.ResourceDat
 
 	newData := map[string]interface{}{}
 	updateData := false
-	if d.HasChange("data") {
+
+	if d.HasChange("data_wo_revision") {
+		updateData = true
+		wodata, diags := d.GetRawConfigAt(cty.GetAttrPath("data_wo"))
+		if diags.HasError() {
+			return diags
+		}
+		if wodata.IsWhollyKnown() && !wodata.IsNull() {
+			data := expandCtyStringMap(wodata.AsValueMap())
+			for k, v := range data {
+				newData[k] = base64.StdEncoding.EncodeToString([]byte(v))
+			}
+		}
+	} else if d.HasChange("data") {
 		_, new := d.GetChange("data")
 		new = base64EncodeStringMap(new.(map[string]interface{}))
 		for k, v := range new.(map[string]interface{}) {
@@ -246,7 +333,20 @@ func resourceKubernetesSecretV1Update(ctx context.Context, d *schema.ResourceDat
 			newData[k] = vv
 		}
 	}
-	if d.HasChange("binary_data") {
+
+	if d.HasChange("binary_data_wo_revision") {
+		updateData = true
+		wobindata, diags := d.GetRawConfigAt(cty.GetAttrPath("binary_data_wo"))
+		if diags.HasError() {
+			return diags
+		}
+		if wobindata.IsWhollyKnown() && !wobindata.IsNull() {
+			data := expandCtyBase64MapToByteMap(wobindata.AsValueMap())
+			for k, v := range data {
+				newData[k] = base64.StdEncoding.EncodeToString([]byte(v))
+			}
+		}
+	} else if d.HasChange("binary_data") {
 		_, new := d.GetChange("binary_data")
 		for k, v := range new.(map[string]interface{}) {
 			newData[k] = v
@@ -268,7 +368,7 @@ func resourceKubernetesSecretV1Update(ctx context.Context, d *schema.ResourceDat
 	if d.HasChange("immutable") {
 		ops = append(ops, &ReplaceOperation{
 			Path:  "/immutable",
-			Value: ptrToBool(d.Get("immutable").(bool)),
+			Value: ptr.To(d.Get("immutable").(bool)),
 		})
 	}
 
@@ -284,7 +384,7 @@ func resourceKubernetesSecretV1Update(ctx context.Context, d *schema.ResourceDat
 	}
 
 	log.Printf("[INFO] Submitting updated secret: %#v", out.ObjectMeta)
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 
 	return resourceKubernetesSecretV1Read(ctx, d, meta)
 }
@@ -295,7 +395,7 @@ func resourceKubernetesSecretV1Delete(ctx context.Context, d *schema.ResourceDat
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -322,7 +422,7 @@ func resourceKubernetesSecretV1Exists(ctx context.Context, d *schema.ResourceDat
 		return false, err
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return false, err
 	}
@@ -337,4 +437,23 @@ func resourceKubernetesSecretV1Exists(ctx context.Context, d *schema.ResourceDat
 	}
 
 	return true, err
+}
+
+func expandCtyBase64MapToByteMap(m map[string]cty.Value) map[string][]byte {
+	r := map[string][]byte{}
+	for k, v := range m {
+		b, err := base64.StdEncoding.DecodeString(v.AsString())
+		if err == nil {
+			r[k] = b
+		}
+	}
+	return r
+}
+
+func expandCtyStringMap(m map[string]cty.Value) map[string]string {
+	r := map[string]string{}
+	for k, v := range m {
+		r[k] = v.AsString()
+	}
+	return r
 }

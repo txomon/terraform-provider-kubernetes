@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -22,10 +22,8 @@ func TestAccKubernetesResourceQuotaV1_basic(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesResourceQuotaV1Destroy,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		Steps: []resource.TestStep{
 			{
 				Config: testAccKubernetesResourceQuotaV1Config_basic(name),
@@ -103,10 +101,8 @@ func TestAccKubernetesResourceQuotaV1_generatedName(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesResourceQuotaV1Destroy,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		Steps: []resource.TestStep{
 			{
 				Config: testAccKubernetesResourceQuotaV1Config_generatedName(ns, prefix),
@@ -140,10 +136,8 @@ func TestAccKubernetesResourceQuotaV1_withScopes(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesResourceQuotaV1Destroy,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		Steps: []resource.TestStep{
 			{
 				Config: testAccKubernetesResourceQuotaV1Config_withScopes(name),
@@ -194,10 +188,8 @@ func TestAccKubernetesResourceQuotaV1_scopeSelector(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesResourceQuotaV1Destroy,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		Steps: []resource.TestStep{
 			{
 				Config: testAccKubernetesResourceQuotaV1ConfigScopeSelector(name),
@@ -289,7 +281,7 @@ func testAccCheckKubernetesResourceQuotaV1Destroy(s *terraform.State) error {
 			continue
 		}
 
-		namespace, name, err := idParts(rs.Primary.ID)
+		namespace, name, err := IdParts(rs.Primary.ID)
 		if err != nil {
 			return err
 		}
@@ -318,7 +310,7 @@ func testAccCheckKubernetesResourceQuotaV1Exists(n string, obj *api.ResourceQuot
 		}
 		ctx := context.TODO()
 
-		namespace, name, err := idParts(rs.Primary.ID)
+		namespace, name, err := IdParts(rs.Primary.ID)
 		if err != nil {
 			return err
 		}
@@ -334,7 +326,7 @@ func testAccCheckKubernetesResourceQuotaV1Exists(n string, obj *api.ResourceQuot
 }
 
 func testAccKubernetesResourceQuotaV1Config_basic(name string) string {
-	return fmt.Sprintf(`resource "kubernetes_namespace_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_namespace" "test" {
   metadata {
     name = %[1]q
   }
@@ -353,7 +345,7 @@ resource "kubernetes_resource_quota_v1" "test" {
     }
 
     name      = %[1]q
-    namespace = kubernetes_namespace_v1.test.metadata.0.name
+    namespace = kubernetes_namespace.test.metadata.0.name
   }
 
   spec {
@@ -368,7 +360,7 @@ resource "kubernetes_resource_quota_v1" "test" {
 }
 
 func testAccKubernetesResourceQuotaV1Config_metaModified(name string) string {
-	return fmt.Sprintf(`resource "kubernetes_namespace_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_namespace" "test" {
   metadata {
     name = %[1]q
   }
@@ -388,7 +380,7 @@ resource "kubernetes_resource_quota_v1" "test" {
     }
 
     name      = %[1]q
-    namespace = kubernetes_namespace_v1.test.metadata.0.name
+    namespace = kubernetes_namespace.test.metadata.0.name
   }
 
   spec {
@@ -403,7 +395,7 @@ resource "kubernetes_resource_quota_v1" "test" {
 }
 
 func testAccKubernetesResourceQuotaV1Config_specModified(name string) string {
-	return fmt.Sprintf(`resource "kubernetes_namespace_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_namespace" "test" {
   metadata {
     name = %[1]q
   }
@@ -412,7 +404,7 @@ func testAccKubernetesResourceQuotaV1Config_specModified(name string) string {
 resource "kubernetes_resource_quota_v1" "test" {
   metadata {
     name      = %[1]q
-    namespace = kubernetes_namespace_v1.test.metadata.0.name
+    namespace = kubernetes_namespace.test.metadata.0.name
   }
 
   spec {
@@ -428,7 +420,7 @@ resource "kubernetes_resource_quota_v1" "test" {
 }
 
 func testAccKubernetesResourceQuotaV1Config_generatedName(ns, prefix string) string {
-	return fmt.Sprintf(`resource "kubernetes_namespace_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_namespace" "test" {
   metadata {
     name = %[1]q
   }
@@ -437,7 +429,7 @@ func testAccKubernetesResourceQuotaV1Config_generatedName(ns, prefix string) str
 resource "kubernetes_resource_quota_v1" "test" {
   metadata {
     generate_name = %[2]q
-    namespace     = kubernetes_namespace_v1.test.metadata.0.name
+    namespace     = kubernetes_namespace.test.metadata.0.name
   }
 
   spec {
@@ -450,7 +442,7 @@ resource "kubernetes_resource_quota_v1" "test" {
 }
 
 func testAccKubernetesResourceQuotaV1Config_withScopes(name string) string {
-	return fmt.Sprintf(`resource "kubernetes_namespace_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_namespace" "test" {
   metadata {
     name = %[1]q
   }
@@ -459,7 +451,7 @@ func testAccKubernetesResourceQuotaV1Config_withScopes(name string) string {
 resource "kubernetes_resource_quota_v1" "test" {
   metadata {
     name      = %[1]q
-    namespace = kubernetes_namespace_v1.test.metadata.0.name
+    namespace = kubernetes_namespace.test.metadata.0.name
   }
 
   spec {
@@ -474,7 +466,7 @@ resource "kubernetes_resource_quota_v1" "test" {
 }
 
 func testAccKubernetesResourceQuotaV1Config_withScopesModified(name string) string {
-	return fmt.Sprintf(`resource "kubernetes_namespace_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_namespace" "test" {
   metadata {
     name = %[1]q
   }
@@ -483,7 +475,7 @@ func testAccKubernetesResourceQuotaV1Config_withScopesModified(name string) stri
 resource "kubernetes_resource_quota_v1" "test" {
   metadata {
     name      = %[1]q
-    namespace = kubernetes_namespace_v1.test.metadata.0.name
+    namespace = kubernetes_namespace.test.metadata.0.name
   }
 
   spec {
@@ -498,7 +490,7 @@ resource "kubernetes_resource_quota_v1" "test" {
 }
 
 func testAccKubernetesResourceQuotaV1ConfigScopeSelector(name string) string {
-	return fmt.Sprintf(`resource "kubernetes_namespace_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_namespace" "test" {
   metadata {
     name = %[1]q
   }
@@ -517,7 +509,7 @@ resource "kubernetes_resource_quota_v1" "test" {
     }
 
     name      = %[1]q
-    namespace = kubernetes_namespace_v1.test.metadata.0.name
+    namespace = kubernetes_namespace.test.metadata.0.name
   }
 
   spec {
@@ -540,7 +532,7 @@ resource "kubernetes_resource_quota_v1" "test" {
 }
 
 func testAccKubernetesResourceQuotaV1ConfigScopeSelectorModified(name string) string {
-	return fmt.Sprintf(`resource "kubernetes_namespace_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_namespace" "test" {
   metadata {
     name = %[1]q
   }
@@ -559,7 +551,7 @@ resource "kubernetes_resource_quota_v1" "test" {
     }
 
     name      = %[1]q
-    namespace = kubernetes_namespace_v1.test.metadata.0.name
+    namespace = kubernetes_namespace.test.metadata.0.name
   }
 
   spec {
@@ -582,7 +574,7 @@ resource "kubernetes_resource_quota_v1" "test" {
 }
 
 func testAccKubernetesResourceQuotaV1ConfigMultipleMatchExpression(name string) string {
-	return fmt.Sprintf(`resource "kubernetes_namespace_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_namespace" "test" {
   metadata {
     name = %[1]q
   }
@@ -601,7 +593,7 @@ resource "kubernetes_resource_quota_v1" "test" {
     }
 
     name      = %[1]q
-    namespace = kubernetes_namespace_v1.test.metadata.0.name
+    namespace = kubernetes_namespace.test.metadata.0.name
   }
 
   spec {

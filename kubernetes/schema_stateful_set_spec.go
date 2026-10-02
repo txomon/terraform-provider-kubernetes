@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -103,6 +103,43 @@ func statefulSetSpecFields() map[string]*schema.Schema {
 			Elem: &schema.Resource{
 				Schema: persistentVolumeClaimFields(),
 			},
+		},
+		"persistent_volume_claim_retention_policy": {
+			Type:        schema.TypeList,
+			Optional:    true,
+			Computed:    true,
+			Description: "The field controls if and how PVCs are deleted during the lifecycle of a StatefulSet.",
+			Elem: &schema.Resource{
+				Schema: map[string]*schema.Schema{
+					"when_deleted": {
+						Type:        schema.TypeString,
+						Description: "This field controls what happens when a Statefulset is deleted. Default is Retain.",
+						Optional:    true,
+						Default:     "Retain",
+						ValidateFunc: validation.StringInSlice([]string{
+							"Retain",
+							"Delete",
+						}, false),
+					},
+					"when_scaled": {
+						Type:        schema.TypeString,
+						Description: "This field controls what happens when a Statefulset is scaled. Default is Retain.",
+						Optional:    true,
+						Default:     "Retain",
+						ValidateFunc: validation.StringInSlice([]string{
+							"Retain",
+							"Delete",
+						}, false),
+					},
+				},
+			},
+		},
+		"min_ready_seconds": {
+			Type:         schema.TypeInt,
+			Description:  "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing for it to be considered available. Defaults to 0. (pod will be considered available as soon as it is ready)",
+			Optional:     true,
+			Default:      0,
+			ValidateFunc: validateNonNegativeInteger,
 		},
 	}
 	return s

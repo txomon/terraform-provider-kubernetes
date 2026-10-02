@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -26,8 +26,7 @@ func TestAccKubernetesValidatingWebhookConfigurationV1Beta1_basic(t *testing.T) 
 			skipIfNotAdmissionRegistrationV1(t)
 			skipIfClusterVersionGreaterThanOrEqual(t, "1.22.0")
 		},
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
+
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesValdiatingWebhookConfigurationV1Beta1Destroy,
 		Steps: []resource.TestStep{
@@ -192,8 +191,7 @@ func testAccCheckKubernetesValidatingWebhookConfigurationV1Beta1Exists(n string)
 }
 
 func testAccKubernetesValidatingWebhookConfigurationV1Beta1Config_basic(name string) string {
-	return fmt.Sprintf(`
-resource "kubernetes_validating_webhook_configuration" "test" {
+	return fmt.Sprintf(`resource "kubernetes_validating_webhook_configuration" "test" {
   metadata {
     name = %q
   }
@@ -229,8 +227,7 @@ resource "kubernetes_validating_webhook_configuration" "test" {
 }
 
 func testAccKubernetesValidatingWebhookConfigurationV1Beta1Config_modified(name string) string {
-	return fmt.Sprintf(`
-resource "kubernetes_validating_webhook_configuration" "test" {
+	return fmt.Sprintf(`resource "kubernetes_validating_webhook_configuration" "test" {
   metadata {
     name = %q
   }

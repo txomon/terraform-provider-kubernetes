@@ -1,6 +1,10 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
+// NOTE this API has been deprecated and the resource should be removed
+// in the next major provider version.
+//
+//nolint:all
 package kubernetes
 
 import (
@@ -16,12 +20,14 @@ import (
 	pkgApi "k8s.io/apimachinery/pkg/types"
 )
 
-func resourceKubernetesEndpointsV1() *schema.Resource {
+func resourceKubernetesEndpointsV1(deprecationMessage string) *schema.Resource {
 	return &schema.Resource{
-		CreateContext: resourceKubernetesEndpointsV1Create,
-		ReadContext:   resourceKubernetesEndpointsV1Read,
-		UpdateContext: resourceKubernetesEndpointsV1Update,
-		DeleteContext: resourceKubernetesEndpointsV1Delete,
+		Description:        "An Endpoints resource is an abstraction, linked to a Service, which defines the list of endpoints that actually implement the service.",
+		CreateContext:      resourceKubernetesEndpointsV1Create,
+		ReadContext:        resourceKubernetesEndpointsV1Read,
+		DeprecationMessage: deprecationMessage,
+		UpdateContext:      resourceKubernetesEndpointsV1Update,
+		DeleteContext:      resourceKubernetesEndpointsV1Delete,
 		Importer: &schema.ResourceImporter{
 			StateContext: schema.ImportStatePassthroughContext,
 		},
@@ -56,7 +62,7 @@ func resourceKubernetesEndpointsV1Create(ctx context.Context, d *schema.Resource
 		return diag.Errorf("Failed to create endpoints because: %s", err)
 	}
 	log.Printf("[INFO] Submitted new endpoints: %#v", out)
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 
 	return resourceKubernetesEndpointsV1Read(ctx, d, meta)
 }
@@ -75,7 +81,7 @@ func resourceKubernetesEndpointsV1Read(ctx context.Context, d *schema.ResourceDa
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.Errorf("Failed to read endpoints because: %s", err)
 	}
@@ -108,7 +114,7 @@ func resourceKubernetesEndpointsV1Update(ctx context.Context, d *schema.Resource
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.Errorf("Failed to update endpoints because: %s", err)
 	}
@@ -131,7 +137,7 @@ func resourceKubernetesEndpointsV1Update(ctx context.Context, d *schema.Resource
 		return diag.Errorf("Failed to update endpoints: %s", err)
 	}
 	log.Printf("[INFO] Submitted updated endpoints: %#v", out)
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 
 	return resourceKubernetesEndpointsV1Read(ctx, d, meta)
 }
@@ -142,7 +148,7 @@ func resourceKubernetesEndpointsV1Delete(ctx context.Context, d *schema.Resource
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.Errorf("Failed to delete endpoints because: %s", err)
 	}
@@ -166,7 +172,7 @@ func resourceKubernetesEndpointsV1Exists(ctx context.Context, d *schema.Resource
 		return false, err
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return false, err
 	}

@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -11,19 +11,20 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"k8s.io/api/batch/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func resourceKubernetesCronJobV1Beta1() *schema.Resource {
+func resourceKubernetesCronJobV1Beta1(deprecationMessage string) *schema.Resource {
 	return &schema.Resource{
-		CreateContext: resourceKubernetesCronJobV1Beta1Create,
-		ReadContext:   resourceKubernetesCronJobV1Beta1Read,
-		UpdateContext: resourceKubernetesCronJobV1Beta1Update,
-		DeleteContext: resourceKubernetesCronJobV1Beta1Delete,
+		CreateContext:      resourceKubernetesCronJobV1Beta1Create,
+		ReadContext:        resourceKubernetesCronJobV1Beta1Read,
+		DeprecationMessage: deprecationMessage,
+		UpdateContext:      resourceKubernetesCronJobV1Beta1Update,
+		DeleteContext:      resourceKubernetesCronJobV1Beta1Delete,
 		Importer: &schema.ResourceImporter{
 			StateContext: schema.ImportStatePassthroughContext,
 		},
@@ -82,7 +83,7 @@ func resourceKubernetesCronJobV1Beta1Create(ctx context.Context, d *schema.Resou
 	}
 	log.Printf("[INFO] Submitted new cron job: %#v", out)
 
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 
 	return resourceKubernetesCronJobV1Beta1Read(ctx, d, meta)
 }
@@ -93,7 +94,7 @@ func resourceKubernetesCronJobV1Beta1Update(ctx context.Context, d *schema.Resou
 		return diag.FromErr(err)
 	}
 
-	namespace, _, err := idParts(d.Id())
+	namespace, _, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -118,7 +119,7 @@ func resourceKubernetesCronJobV1Beta1Update(ctx context.Context, d *schema.Resou
 	}
 	log.Printf("[INFO] Submitted updated cron job: %#v", out)
 
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 	return resourceKubernetesCronJobV1Beta1Read(ctx, d, meta)
 }
 
@@ -136,7 +137,7 @@ func resourceKubernetesCronJobV1Beta1Read(ctx context.Context, d *schema.Resourc
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -150,24 +151,10 @@ func resourceKubernetesCronJobV1Beta1Read(ctx context.Context, d *schema.Resourc
 	log.Printf("[INFO] Received cron job: %#v", job)
 
 	// Remove server-generated labels unless using manual selector
-	if _, ok := d.GetOk("spec.0.manual_selector"); !ok {
-		labels := job.ObjectMeta.Labels
-
-		if _, ok := labels["controller-uid"]; ok {
-			delete(labels, "controller-uid")
-		}
-
-		if _, ok := labels["cron-job-name"]; ok {
-			delete(labels, "cron-job-name")
-		}
-
-		if job.Spec.JobTemplate.Spec.Selector != nil &&
-			job.Spec.JobTemplate.Spec.Selector.MatchLabels != nil {
-			labels = job.Spec.JobTemplate.Spec.Selector.MatchLabels
-		}
-
-		if _, ok := labels["controller-uid"]; ok {
-			delete(labels, "controller-uid")
+	if _, ok := d.GetOk("spec.0.job_template.spec.0.manual_selector"); !ok {
+		removeGeneratedLabels(job.ObjectMeta.Labels)
+		if job.Spec.JobTemplate.Spec.Selector != nil {
+			removeGeneratedLabels(job.Spec.JobTemplate.Spec.Selector.MatchLabels)
 		}
 	}
 
@@ -195,7 +182,7 @@ func resourceKubernetesCronJobV1Beta1Delete(ctx context.Context, d *schema.Resou
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -206,17 +193,17 @@ func resourceKubernetesCronJobV1Beta1Delete(ctx context.Context, d *schema.Resou
 		return diag.FromErr(err)
 	}
 
-	err = resource.RetryContext(ctx, d.Timeout(schema.TimeoutDelete), func() *resource.RetryError {
+	err = retry.RetryContext(ctx, d.Timeout(schema.TimeoutDelete), func() *retry.RetryError {
 		_, err := conn.BatchV1beta1().CronJobs(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			if statusErr, ok := err.(*errors.StatusError); ok && errors.IsNotFound(statusErr) {
 				return nil
 			}
-			return resource.NonRetryableError(err)
+			return retry.NonRetryableError(err)
 		}
 
 		e := fmt.Errorf("Cron Job %s still exists", name)
-		return resource.RetryableError(e)
+		return retry.RetryableError(e)
 	})
 	if err != nil {
 		return diag.FromErr(err)
@@ -234,7 +221,7 @@ func resourceKubernetesCronJobV1Beta1Exists(ctx context.Context, d *schema.Resou
 		return false, err
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return false, err
 	}

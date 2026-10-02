@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -142,6 +142,12 @@ func TestAccKubernetesPodV1_with_pod_affinity_with_required_during_scheduling_ig
 					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.label_selector.0.match_expressions.0.values.0", keyName), "bar"),
 					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.label_selector.0.match_expressions.0.values.1", keyName), "foo"),
 					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.label_selector.0.match_labels.%%", keyName), "0"),
+					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.namespace_selector.#", keyName), "1"),
+					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.namespace_selector.0.match_expressions.#", keyName), "1"),
+					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.namespace_selector.0.match_expressions.0.key", keyName), "environment"),
+					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.namespace_selector.0.match_expressions.0.operator", keyName), "In"),
+					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.namespace_selector.0.match_expressions.0.values.#", keyName), "1"),
+					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.namespace_selector.0.match_expressions.0.values.0", keyName), "production"),
 					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.namespaces.#", keyName), "0"),
 					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.topology_key", keyName), "kubernetes.io/hostname"),
 				),
@@ -178,6 +184,12 @@ func TestAccKubernetesPodV1_with_pod_affinity_with_preferred_during_scheduling_i
 					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.pod_affinity_term.0.label_selector.0.match_expressions.0.values.0", keyName), "bar"),
 					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.pod_affinity_term.0.label_selector.0.match_expressions.0.values.1", keyName), "foo"),
 					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.pod_affinity_term.0.label_selector.0.match_labels.%%", keyName), "0"),
+					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.pod_affinity_term.0.namespace_selector.#", keyName), "1"),
+					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.pod_affinity_term.0.namespace_selector.0.match_expressions.#", keyName), "1"),
+					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.pod_affinity_term.0.namespace_selector.0.match_expressions.0.key", keyName), "environment"),
+					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.pod_affinity_term.0.namespace_selector.0.match_expressions.0.operator", keyName), "In"),
+					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.pod_affinity_term.0.namespace_selector.0.match_expressions.0.values.#", keyName), "1"),
+					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.pod_affinity_term.0.namespace_selector.0.match_expressions.0.values.0", keyName), "production"),
 					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.pod_affinity_term.0.namespaces.#", keyName), "1"),
 					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.pod_affinity_term.0.namespaces.0", keyName), "default"),
 					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.pod_affinity_term.0.topology_key", keyName), "kubernetes.io/hostname"),
@@ -196,7 +208,7 @@ func TestAccKubernetesPodV1_with_pod_anti_affinity_with_required_during_scheduli
 	resourceName := "kubernetes_pod_v1.test"
 
 	resource.ParallelTest(t, resource.TestCase{
-		PreCheck:          func() { testAccPreCheck(t); skipIfRunningInMinikube(t) },
+		PreCheck:          func() { testAccPreCheck(t); skipIfRunningInMinikube(t); skipIfRunningInKind(t) },
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesPodV1Destroy,
 		Steps: []resource.TestStep{
@@ -215,6 +227,12 @@ func TestAccKubernetesPodV1_with_pod_anti_affinity_with_required_during_scheduli
 					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.label_selector.0.match_expressions.0.values.0", keyName), "bar"),
 					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.label_selector.0.match_expressions.0.values.1", keyName), "foo"),
 					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.label_selector.0.match_labels.%%", keyName), "0"),
+					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.namespace_selector.#", keyName), "1"),
+					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.namespace_selector.0.match_expressions.#", keyName), "1"),
+					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.namespace_selector.0.match_expressions.0.key", keyName), "environment"),
+					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.namespace_selector.0.match_expressions.0.operator", keyName), "In"),
+					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.namespace_selector.0.match_expressions.0.values.#", keyName), "1"),
+					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.namespace_selector.0.match_expressions.0.values.0", keyName), "production"),
 					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.namespaces.#", keyName), "0"),
 					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.topology_key", keyName), "kubernetes.io/hostname"),
 				),
@@ -251,6 +269,12 @@ func TestAccKubernetesPodV1_with_pod_anti_affinity_with_preferred_during_schedul
 					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.pod_affinity_term.0.label_selector.0.match_expressions.0.values.0", keyName), "bar"),
 					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.pod_affinity_term.0.label_selector.0.match_expressions.0.values.1", keyName), "foo"),
 					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.pod_affinity_term.0.label_selector.0.match_labels.%%", keyName), "0"),
+					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.pod_affinity_term.0.namespace_selector.#", keyName), "1"),
+					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.pod_affinity_term.0.namespace_selector.0.match_expressions.#", keyName), "1"),
+					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.pod_affinity_term.0.namespace_selector.0.match_expressions.0.key", keyName), "environment"),
+					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.pod_affinity_term.0.namespace_selector.0.match_expressions.0.operator", keyName), "In"),
+					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.pod_affinity_term.0.namespace_selector.0.match_expressions.0.values.#", keyName), "1"),
+					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.pod_affinity_term.0.namespace_selector.0.match_expressions.0.values.0", keyName), "production"),
 					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.pod_affinity_term.0.namespaces.#", keyName), "0"),
 					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.pod_affinity_term.0.topology_key", keyName), "kubernetes.io/hostname"),
 					resource.TestCheckResourceAttr(resourceName, fmt.Sprintf("%s.0.weight", keyName), "100"),
@@ -261,7 +285,7 @@ func TestAccKubernetesPodV1_with_pod_anti_affinity_with_preferred_during_schedul
 }
 
 func testAccKubernetesPodV1ConfigWithNodeAffinityWithRequiredDuringSchedulingIgnoredDuringExecution_MatchExpressions(podName, imageName string) string {
-	return fmt.Sprintf(`resource "kubernetes_namespace_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_namespace" "test" {
   metadata {
     name = %[1]q
   }
@@ -272,7 +296,7 @@ resource "kubernetes_pod_v1" "test" {
     labels = {
       app = "pod_label"
     }
-    namespace = kubernetes_namespace_v1.test.metadata.0.name
+    namespace = kubernetes_namespace.test.metadata.0.name
     name      = %[1]q
   }
   spec {
@@ -312,7 +336,7 @@ resource "kubernetes_pod_v1" "test" {
 }
 
 func testAccKubernetesPodV1ConfigWithNodeAffinityWithRequiredDuringSchedulingIgnoredDuringExecution_MatchFields(podName, imageName string) string {
-	return fmt.Sprintf(`resource "kubernetes_namespace_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_namespace" "test" {
   metadata {
     name = %[1]q
   }
@@ -323,7 +347,7 @@ resource "kubernetes_pod_v1" "test" {
     labels = {
       app = "pod_label"
     }
-    namespace = kubernetes_namespace_v1.test.metadata.0.name
+    namespace = kubernetes_namespace.test.metadata.0.name
     name      = %[1]q
   }
   spec {
@@ -358,7 +382,7 @@ resource "kubernetes_pod_v1" "test" {
 }
 
 func testAccKubernetesPodV1ConfigWithNodeAffinityWithPreferredDuringSchedulingIgnoredDuringExecution_MatchExpressions(podName, imageName string) string {
-	return fmt.Sprintf(`resource "kubernetes_namespace_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_namespace" "test" {
   metadata {
     name = %[1]q
   }
@@ -369,7 +393,7 @@ resource "kubernetes_pod_v1" "test" {
     labels = {
       app = "pod_label"
     }
-    namespace = kubernetes_namespace_v1.test.metadata.0.name
+    namespace = kubernetes_namespace.test.metadata.0.name
     name      = %[1]q
   }
   spec {
@@ -410,7 +434,7 @@ resource "kubernetes_pod_v1" "test" {
 }
 
 func testAccKubernetesPodV1ConfigWithNodeAffinityWithPreferredDuringSchedulingIgnoredDuringExecution_MatchFields(podName, imageName string) string {
-	return fmt.Sprintf(`resource "kubernetes_namespace_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_namespace" "test" {
   metadata {
     name = %[1]q
   }
@@ -421,7 +445,7 @@ resource "kubernetes_pod_v1" "test" {
     labels = {
       app = "pod_label"
     }
-    namespace = kubernetes_namespace_v1.test.metadata.0.name
+    namespace = kubernetes_namespace.test.metadata.0.name
     name      = %[1]q
   }
   spec {
@@ -457,9 +481,12 @@ resource "kubernetes_pod_v1" "test" {
 }
 
 func testAccKubernetesPodV1ConfigWithPodAffinityWithRequiredDuringSchedulingIgnoredDuringExecution(podName, imageName string) string {
-	return fmt.Sprintf(`resource "kubernetes_namespace_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_namespace" "test" {
   metadata {
     name = %[1]q
+    labels = {
+      environment = "production"
+    }
   }
 }
 
@@ -468,7 +495,7 @@ resource "kubernetes_pod_v1" "test" {
     labels = {
       app = "pod_label"
     }
-    namespace = kubernetes_namespace_v1.test.metadata.0.name
+    namespace = kubernetes_namespace.test.metadata.0.name
     name      = %[1]q
   }
   spec {
@@ -480,6 +507,13 @@ resource "kubernetes_pod_v1" "test" {
               key      = "security"
               operator = "NotIn"
               values   = ["foo", "bar"]
+            }
+          }
+          namespace_selector {
+            match_expressions {
+              key      = "environment"
+              operator = "In"
+              values   = ["production"]
             }
           }
           topology_key = "kubernetes.io/hostname"
@@ -504,9 +538,12 @@ resource "kubernetes_pod_v1" "test" {
 }
 
 func testAccKubernetesPodV1ConfigWithPodAffinityWithPreferredDuringSchedulingIgnoredDuringExecution(podName, imageName string) string {
-	return fmt.Sprintf(`resource "kubernetes_namespace_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_namespace" "test" {
   metadata {
     name = %[1]q
+    labels = {
+      environment = "production"
+    }
   }
 }
 
@@ -515,7 +552,7 @@ resource "kubernetes_pod_v1" "test" {
     labels = {
       app = "pod_label"
     }
-    namespace = kubernetes_namespace_v1.test.metadata.0.name
+    namespace = kubernetes_namespace.test.metadata.0.name
     name      = %[1]q
   }
   spec {
@@ -529,6 +566,13 @@ resource "kubernetes_pod_v1" "test" {
                 key      = "security"
                 operator = "NotIn"
                 values   = ["foo", "bar"]
+              }
+            }
+            namespace_selector {
+              match_expressions {
+                key      = "environment"
+                operator = "In"
+                values   = ["production"]
               }
             }
             namespaces   = ["default"]
@@ -555,9 +599,12 @@ resource "kubernetes_pod_v1" "test" {
 }
 
 func testAccKubernetesPodV1ConfigWithPodAntiAffinityWithRequiredDuringSchedulingIgnoredDuringExecution(podName, imageName string) string {
-	return fmt.Sprintf(`resource "kubernetes_namespace_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_namespace" "test" {
   metadata {
     name = %[1]q
+    labels = {
+      environment = "production"
+    }
   }
 }
 
@@ -566,7 +613,7 @@ resource "kubernetes_pod_v1" "test" {
     labels = {
       app = "pod_label"
     }
-    namespace = kubernetes_namespace_v1.test.metadata.0.name
+    namespace = kubernetes_namespace.test.metadata.0.name
     name      = %[1]q
   }
   spec {
@@ -578,6 +625,13 @@ resource "kubernetes_pod_v1" "test" {
               key      = "security"
               operator = "NotIn"
               values   = ["foo", "bar"]
+            }
+          }
+          namespace_selector {
+            match_expressions {
+              key      = "environment"
+              operator = "In"
+              values   = ["production"]
             }
           }
           topology_key = "kubernetes.io/hostname"
@@ -602,9 +656,12 @@ resource "kubernetes_pod_v1" "test" {
 }
 
 func testAccKubernetesPodV1ConfigWithPodAntiAffinityWithPreferredDuringSchedulingIgnoredDuringExecution(podName, imageName string) string {
-	return fmt.Sprintf(`resource "kubernetes_namespace_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_namespace" "test" {
   metadata {
     name = %[1]q
+    labels = {
+      environment = "production"
+    }
   }
 }
 
@@ -613,7 +670,7 @@ resource "kubernetes_pod_v1" "test" {
     labels = {
       app = "pod_label"
     }
-    namespace = kubernetes_namespace_v1.test.metadata.0.name
+    namespace = kubernetes_namespace.test.metadata.0.name
     name      = %[1]q
   }
   spec {
@@ -627,6 +684,13 @@ resource "kubernetes_pod_v1" "test" {
                 key      = "security"
                 operator = "NotIn"
                 values   = ["foo", "bar"]
+              }
+            }
+            namespace_selector {
+              match_expressions {
+                key      = "environment"
+                operator = "In"
+                values   = ["production"]
               }
             }
             topology_key = "kubernetes.io/hostname"

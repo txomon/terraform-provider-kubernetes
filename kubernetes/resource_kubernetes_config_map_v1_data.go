@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -15,10 +15,12 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 )
 
 func resourceKubernetesConfigMapV1Data() *schema.Resource {
 	return &schema.Resource{
+		Description:   "This resource allows Terraform to manage data within a pre-existing ConfigMap. This resource uses [field management](https://kubernetes.io/docs/reference/using-api/server-side-apply/#field-management) and [server-side apply](https://kubernetes.io/docs/reference/using-api/server-side-apply/) to manage only the data that is defined in the Terraform configuration. Existing data not specified in the configuration will be ignored. If data specified in the config and is already managed by another client it will cause a conflict which can be overridden by setting `force` to true.",
 		CreateContext: resourceKubernetesConfigMapV1DataCreate,
 		ReadContext:   resourceKubernetesConfigMapV1DataRead,
 		UpdateContext: resourceKubernetesConfigMapV1DataUpdate,
@@ -68,7 +70,7 @@ func resourceKubernetesConfigMapV1Data() *schema.Resource {
 
 func resourceKubernetesConfigMapV1DataCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	metadata := expandMetadata(d.Get("metadata").([]interface{}))
-	d.SetId(buildId(metadata))
+	d.SetId(BuildId(metadata))
 	diag := resourceKubernetesConfigMapV1DataUpdate(ctx, d, m)
 	if diag.HasError() {
 		d.SetId("")
@@ -82,7 +84,7 @@ func resourceKubernetesConfigMapV1DataRead(ctx context.Context, d *schema.Resour
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -194,7 +196,7 @@ func resourceKubernetesConfigMapV1DataUpdate(ctx context.Context, d *schema.Reso
 		patchbytes,
 		v1.PatchOptions{
 			FieldManager: d.Get("field_manager").(string),
-			Force:        ptrToBool(d.Get("force").(bool)),
+			Force:        ptr.To(d.Get("force").(bool)),
 		},
 	)
 	if err != nil {

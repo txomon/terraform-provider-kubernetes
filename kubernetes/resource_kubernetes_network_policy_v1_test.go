@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -9,10 +9,14 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
+	"github.com/hashicorp/terraform-plugin-testing/statecheck"
+	"github.com/hashicorp/terraform-plugin-testing/tfversion"
 )
 
 func TestAccKubernetesNetworkPolicyV1_basic(t *testing.T) {
@@ -22,8 +26,6 @@ func TestAccKubernetesNetworkPolicyV1_basic(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesNetworkPolicyV1Destroy,
 		Steps: []resource.TestStep{
@@ -104,6 +106,41 @@ func TestAccKubernetesNetworkPolicyV1_basic(t *testing.T) {
 					resource.TestCheckResourceAttr(resourceName, "spec.0.ingress.0.from.0.namespace_selector.#", "1"),
 					resource.TestCheckResourceAttr(resourceName, "spec.0.ingress.0.from.0.namespace_selector.0.match_labels.name", "default"),
 					resource.TestCheckResourceAttr(resourceName, "spec.0.ingress.0.from.0.pod_selector.#", "0"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.policy_types.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.policy_types.0", "Ingress"),
+				),
+			},
+			{
+				Config: testAccKubernetesNetworkPolicyV1Config_endPorts(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckKubernetesNetworkPolicyV1Exists(resourceName, &conf),
+					resource.TestCheckResourceAttr(resourceName, "metadata.0.annotations.%", "0"),
+					resource.TestCheckResourceAttr(resourceName, "metadata.0.labels.%", "0"),
+					resource.TestCheckResourceAttr(resourceName, "metadata.0.name", name),
+					resource.TestCheckResourceAttrSet(resourceName, "metadata.0.generation"),
+					resource.TestCheckResourceAttrSet(resourceName, "metadata.0.resource_version"),
+					resource.TestCheckResourceAttrSet(resourceName, "metadata.0.uid"),
+					resource.TestCheckResourceAttr(resourceName, "spec.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.pod_selector.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.pod_selector.0.match_expressions.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.pod_selector.0.match_expressions.0.key", "name"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.pod_selector.0.match_expressions.0.operator", "In"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.pod_selector.0.match_expressions.0.values.#", "2"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.pod_selector.0.match_expressions.0.values.1", "webfront"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.pod_selector.0.match_expressions.0.values.0", "api"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.ingress.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.ingress.0.ports.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.ingress.0.ports.0.port", "8126"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.ingress.0.ports.0.protocol", "TCP"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.ingress.0.ports.0.end_port", "9000"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.ingress.0.from.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.ingress.0.from.0.namespace_selector.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.ingress.0.from.0.namespace_selector.0.match_labels.name", "default"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.ingress.0.from.0.pod_selector.#", "0"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.egress.0.ports.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.egress.0.ports.0.port", "10000"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.egress.0.ports.0.protocol", "TCP"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.egress.0.ports.0.end_port", "65535"),
 					resource.TestCheckResourceAttr(resourceName, "spec.0.policy_types.#", "1"),
 					resource.TestCheckResourceAttr(resourceName, "spec.0.policy_types.0", "Ingress"),
 				),
@@ -272,8 +309,6 @@ func TestAccKubernetesNetworkPolicyV1_withEgressAtCreation(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesNetworkPolicyV1Destroy,
 		Steps: []resource.TestStep{
@@ -332,9 +367,42 @@ func TestAccKubernetesNetworkPolicyV1_withEgressAtCreation(t *testing.T) {
 	})
 }
 
+func TestAccKubernetesNetworkPolicyV1_identity(t *testing.T) {
+	name := fmt.Sprintf("tf-acc-test-%s", acctest.RandString(10))
+	resourceName := "kubernetes_network_policy_v1.test"
+
+	resource.ParallelTest(t, resource.TestCase{
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckKubernetesNetworkPolicyV1Destroy,
+		TerraformVersionChecks: []tfversion.TerraformVersionCheck{
+			tfversion.SkipBelow(tfversion.Version1_12_0),
+		},
+		Steps: []resource.TestStep{
+			{
+				Config: testAccKubernetesNetworkPolicyV1Config_basic(name),
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectIdentity(
+						resourceName, map[string]knownvalue.Check{
+							"namespace":   knownvalue.StringExact("default"),
+							"name":        knownvalue.StringExact(name),
+							"api_version": knownvalue.StringExact("networking.k8s.io/v1"),
+							"kind":        knownvalue.StringExact("NetworkPolicy"),
+						},
+					),
+				},
+			},
+			{
+				ResourceName:    resourceName,
+				ImportState:     true,
+				ImportStateKind: resource.ImportBlockWithResourceIdentity,
+			},
+		},
+	})
+}
+
 func testAccCheckKubernetesNetworkPolicyV1Destroy(s *terraform.State) error {
 	conn, err := testAccProvider.Meta().(KubeClientsets).MainClientset()
-
 	if err != nil {
 		return err
 	}
@@ -345,7 +413,7 @@ func testAccCheckKubernetesNetworkPolicyV1Destroy(s *terraform.State) error {
 			continue
 		}
 
-		namespace, name, err := idParts(rs.Primary.ID)
+		namespace, name, err := IdParts(rs.Primary.ID)
 		if err != nil {
 			return err
 		}
@@ -374,7 +442,7 @@ func testAccCheckKubernetesNetworkPolicyV1Exists(n string, obj *networkingv1.Net
 		}
 		ctx := context.TODO()
 
-		namespace, name, err := idParts(rs.Primary.ID)
+		namespace, name, err := IdParts(rs.Primary.ID)
 		if err != nil {
 			return err
 		}
@@ -482,6 +550,50 @@ func testAccKubernetesNetworkPolicyV1Config_specModified(name string) string {
 `, name)
 }
 
+func testAccKubernetesNetworkPolicyV1Config_endPorts(name string) string {
+	return fmt.Sprintf(`resource "kubernetes_network_policy_v1" "test" {
+  metadata {
+    name      = "%s"
+    namespace = "default"
+  }
+
+  spec {
+    pod_selector {
+      match_expressions {
+        key      = "name"
+        operator = "In"
+        values   = ["webfront", "api"]
+      }
+    }
+
+    ingress {
+      ports {
+        port     = "8126"
+        protocol = "TCP"
+        end_port = "9000"
+      }
+
+      from {
+        namespace_selector {
+          match_labels = {
+            name = "default"
+          }
+        }
+      }
+    }
+    egress {
+      ports {
+        port     = "10000"
+        protocol = "TCP"
+        end_port = "65535"
+      }
+    }
+    policy_types = ["Ingress"]
+  }
+}
+`, name)
+}
+
 func testAccKubernetesNetworkPolicyV1Config_specModified_allow_all_namespaces(name string) string {
 	return fmt.Sprintf(`resource "kubernetes_network_policy_v1" "test" {
   metadata {
@@ -548,6 +660,7 @@ func testAccKubernetesNetworkPolicyV1Config_specModified_deny_other_namespaces(n
 }
 `, name)
 }
+
 func testAccKubernetesNetworkPolicyV1Config_specModified_pod_selector(name string) string {
 	return fmt.Sprintf(`resource "kubernetes_network_policy_v1" "test" {
   metadata {

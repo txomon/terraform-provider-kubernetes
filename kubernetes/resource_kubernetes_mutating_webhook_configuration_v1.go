@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -22,14 +22,15 @@ func resourceKubernetesMutatingWebhookConfigurationV1() *schema.Resource {
 	apiDoc := admissionregistrationv1.MutatingWebhookConfiguration{}.SwaggerDoc()
 	webhookDoc := admissionregistrationv1.MutatingWebhook{}.SwaggerDoc()
 	return &schema.Resource{
+		Description:   "Mutating Webhook Configuration configures a [mutating admission webhook](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#what-are-admission-webhooks).",
 		CreateContext: resourceKubernetesMutatingWebhookConfigurationV1Create,
 		ReadContext:   resourceKubernetesMutatingWebhookConfigurationV1Read,
 		UpdateContext: resourceKubernetesMutatingWebhookConfigurationV1Update,
 		DeleteContext: resourceKubernetesMutatingWebhookConfigurationV1Delete,
 		Importer: &schema.ResourceImporter{
-			StateContext: schema.ImportStatePassthroughContext,
+			StateContext: resourceIdentityImportNonNamespaced,
 		},
-
+		Identity: resourceIdentitySchemaNonNamespaced(),
 		Schema: map[string]*schema.Schema{
 			"metadata": metadataSchema("mutating webhook configuration", true),
 			"webhook": {
@@ -187,12 +188,17 @@ func resourceKubernetesMutatingWebhookConfigurationV1Read(ctx context.Context, d
 
 	err = d.Set("metadata", flattenMetadata(cfg.ObjectMeta, d, meta))
 	if err != nil {
-		return nil
+		return diag.FromErr(err)
 	}
 
 	log.Printf("[DEBUG] Setting webhook to: %#v", cfg.Webhooks)
 
 	err = d.Set("webhook", flattenMutatingWebhooks(cfg.Webhooks))
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	err = setResourceIdentityNonNamespaced(d, "admissionregistration.k8s.io/v1", "MutatingWebhookConfiguration", name)
 	if err != nil {
 		return diag.FromErr(err)
 	}

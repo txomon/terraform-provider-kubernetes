@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -243,12 +243,32 @@ func volumeMountFields() map[string]*schema.Schema {
 			Optional:    true,
 			Description: `Path within the volume from which the container's volume should be mounted. Defaults to "" (volume's root).`,
 		},
+		"sub_path_expr": {
+			Type:        schema.TypeString,
+			Optional:    true,
+			Description: `Dynamic path within the volume from which the container's volume should be mounted. Defaults to "" (volume's root).`,
+		},
 		"mount_propagation": {
 			Type:         schema.TypeString,
 			Description:  "Mount propagation mode. mount_propagation determines how mounts are propagated from the host to container and the other way around. Valid values are None (default), HostToContainer and Bidirectional.",
 			Optional:     true,
 			Default:      "None",
 			ValidateFunc: validation.StringInSlice([]string{"None", "HostToContainer", "Bidirectional"}, false),
+		},
+	}
+}
+
+func volumeDeviceFields() map[string]*schema.Schema {
+	return map[string]*schema.Schema{
+		"device_path": {
+			Type:        schema.TypeString,
+			Required:    true,
+			Description: "Path within the container at which the volume device should be attached. For example '/dev/xvda'.",
+		},
+		"name": {
+			Type:        schema.TypeString,
+			Required:    true,
+			Description: "This must match the Name of a PersistentVolumeClaim.",
 		},
 	}
 }
@@ -595,6 +615,16 @@ func containerFields(isUpdatable bool) map[string]*schema.Schema {
 			Description: "Security options the pod should run with. More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/",
 			Elem:        securityContextSchema(isUpdatable),
 		},
+		"restart_policy": {
+			Type:        schema.TypeString,
+			Optional:    true,
+			Computed:    true,
+			ForceNew:    !isUpdatable,
+			Description: "Restart policy for designating init container as a sidecar. Can only be `Always`. More info: https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/#pod-sidecar-containers.",
+			ValidateFunc: validation.StringInSlice([]string{
+				string(api.RestartPolicyAlways),
+			}, false),
+		},
 		"startup_probe": {
 			Type:        schema.TypeList,
 			Optional:    true,
@@ -649,6 +679,15 @@ func containerFields(isUpdatable bool) map[string]*schema.Schema {
 			Description: "Pod volumes to mount into the container's filesystem. Cannot be updated.",
 			Elem: &schema.Resource{
 				Schema: volumeMountFields(),
+			},
+		},
+		"volume_device": {
+			Type:        schema.TypeList,
+			Optional:    true,
+			ForceNew:    !isUpdatable,
+			Description: "Raw volume devices to attach into the container's filesystem as raw block devices. Cannot be updated.",
+			Elem: &schema.Resource{
+				Schema: volumeDeviceFields(),
 			},
 		},
 		"working_dir": {
@@ -720,7 +759,6 @@ func probeSchema() *schema.Resource {
 	return &schema.Resource{
 		Schema: h,
 	}
-
 }
 
 func securityContextSchema(isUpdatable bool) *schema.Resource {

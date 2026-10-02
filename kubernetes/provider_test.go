@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -13,11 +13,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 
 	gversion "github.com/hashicorp/go-version"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+
+	//"github.com/hashicorp/terraform-plugin-testing/terraform"
 	api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -28,13 +30,15 @@ const (
 	agnhostImage = "registry.k8s.io/e2e-test-images/agnhost:2.43"
 )
 
-var testAccProvider *schema.Provider
-var testAccExternalProviders map[string]resource.ExternalProvider
-var testAccProviderFactories = map[string]func() (*schema.Provider, error){
-	"kubernetes": func() (*schema.Provider, error) {
-		return Provider(), nil
-	},
-}
+var (
+	testAccProvider          *schema.Provider
+	testAccExternalProviders map[string]resource.ExternalProvider
+	testAccProviderFactories = map[string]func() (*schema.Provider, error){
+		"kubernetes": func() (*schema.Provider, error) {
+			return Provider(), nil
+		},
+	}
+)
 
 func init() {
 	testAccProvider = Provider()
@@ -122,7 +126,7 @@ func unsetEnv(t *testing.T) func() {
 		"KUBE_TOKEN":                e.Token,
 	}
 
-	for k, _ := range envVars {
+	for k := range envVars {
 		if err := os.Unsetenv(k); err != nil {
 			t.Fatalf("Error unsetting env var %s: %s", k, err)
 		}
@@ -194,7 +198,6 @@ func testAccPreCheck(t *testing.T) {
 	if diags.HasError() {
 		t.Fatal(diags[0].Summary)
 	}
-	return
 }
 
 func getClusterVersion() (*gversion.Version, error) {
@@ -209,7 +212,6 @@ func getClusterVersion() (*gversion.Version, error) {
 		return nil, err
 	}
 	serverVersion, err := conn.ServerVersion()
-
 	if err != nil {
 		return nil, err
 	}
@@ -220,20 +222,20 @@ func getClusterVersion() (*gversion.Version, error) {
 func setClusterVersionVar(t *testing.T, varName string) {
 	cv, err := getClusterVersion()
 	if err != nil {
-		t.Skip(fmt.Sprint("Could not get cluster version"))
+		t.Skipf("Could not get cluster version")
 	}
 	os.Setenv(varName, fmt.Sprintf("v%s", cv.Core().Original()))
 }
 
 func skipIfClusterVersionLessThan(t *testing.T, vs string) {
 	if clusterVersionLessThan(vs) {
-		t.Skip(fmt.Sprintf("This test does not run on cluster versions below %v", vs))
+		t.Skipf("This test does not run on cluster versions below %v", vs)
 	}
 }
 
 func skipIfClusterVersionGreaterThanOrEqual(t *testing.T, vs string) {
 	if clusterVersionGreaterThanOrEqual(vs) {
-		t.Skip(fmt.Sprintf("This test does not run on cluster versions %v and above", vs))
+		t.Skipf("This test does not run on cluster versions %v and above", vs)
 	}
 }
 
@@ -342,6 +344,16 @@ func skipIfNotRunningInKind(t *testing.T) {
 	}
 	if !isRunningInKind {
 		t.Skip("The Kubernetes endpoint must come from Kind for this test to run - skipping")
+	}
+}
+
+func skipIfRunningInKind(t *testing.T) {
+	isRunningInKind, err := isRunningInKind()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if isRunningInKind {
+		t.Skip("This test can't run in Kind - skipping")
 	}
 }
 

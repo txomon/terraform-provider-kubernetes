@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -26,6 +26,7 @@ var (
 
 func resourceKubernetesPodDisruptionBudgetV1() *schema.Resource {
 	return &schema.Resource{
+		Description:   "A Pod Disruption Budget limits the number of pods of a replicated application that are down simultaneously from voluntary disruptions. For example, a quorum-based application would like to ensure that the number of replicas running is never brought below the number needed for a quorum. A web front end might want to ensure that the number of replicas serving load never falls below a certain percentage of the total.",
 		CreateContext: resourceKubernetesPodDisruptionBudgetV1Create,
 		ReadContext:   resourceKubernetesPodDisruptionBudgetV1Read,
 		UpdateContext: resourceKubernetesPodDisruptionBudgetV1Update,
@@ -84,7 +85,7 @@ func resourceKubernetesPodDisruptionBudgetV1Update(ctx context.Context, d *schem
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -102,7 +103,7 @@ func resourceKubernetesPodDisruptionBudgetV1Update(ctx context.Context, d *schem
 	}
 
 	log.Printf("[INFO] Submitted updated pod disruption budget: %#v", out)
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 
 	return resourceKubernetesPodDisruptionBudgetV1Read(ctx, d, meta)
 }
@@ -130,7 +131,7 @@ func resourceKubernetesPodDisruptionBudgetV1Create(ctx context.Context, d *schem
 	}
 
 	log.Printf("[INFO] Submitted new pod disruption budget: %#v", out)
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 
 	return resourceKubernetesPodDisruptionBudgetV1Read(ctx, d, meta)
 }
@@ -149,7 +150,7 @@ func resourceKubernetesPodDisruptionBudgetV1Read(ctx context.Context, d *schema.
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -181,7 +182,7 @@ func resourceKubernetesPodDisruptionBudgetV1Delete(ctx context.Context, d *schem
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -208,7 +209,7 @@ func resourceKubernetesPodDisruptionBudgetV1Exists(ctx context.Context, d *schem
 		return false, err
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return false, err
 	}

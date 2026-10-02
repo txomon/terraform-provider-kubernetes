@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package morph
@@ -23,6 +23,7 @@ func DeepUnknown(t tftypes.Type, v tftypes.Value, p *tftypes.AttributePath) (tft
 		atts := t.(tftypes.Object).AttributeTypes
 		var vals map[string]tftypes.Value
 		ovals := make(map[string]tftypes.Value, len(atts))
+		otypes := make(map[string]tftypes.Type, len(atts))
 		err := v.As(&vals)
 		if err != nil {
 			return tftypes.Value{}, p.NewError(err)
@@ -34,11 +35,9 @@ func DeepUnknown(t tftypes.Type, v tftypes.Value, p *tftypes.AttributePath) (tft
 				return tftypes.Value{}, np.NewError(err)
 			}
 			ovals[name] = nv
-			if nv.Type().Is(tftypes.Tuple{}) {
-				atts[name] = nv.Type()
-			}
+			otypes[name] = nv.Type()
 		}
-		return tftypes.NewValue(tftypes.Object{AttributeTypes: atts}, ovals), nil
+		return tftypes.NewValue(tftypes.Object{AttributeTypes: otypes}, ovals), nil
 	case t.Is(tftypes.Map{}):
 		if v.IsNull() {
 			return tftypes.NewValue(t, tftypes.UnknownValue), nil

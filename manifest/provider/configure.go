@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package provider
@@ -49,6 +49,13 @@ func (s *RawProviderServer) ConfigureProvider(ctx context.Context, req *tfprotov
 		})
 		return response, nil
 	}
+
+	clcp := req.ClientCapabilities
+	if !cfgVal.IsFullyKnown() && clcp != nil && clcp.DeferralAllowed {
+		// need to deferr actions
+		s.clientConfigUnknown = true
+	}
+
 	err = cfgVal.As(&providerConfig)
 	if err != nil {
 		// invalid configuration schema - this shouldn't happen, bail out now
@@ -57,66 +64,6 @@ func (s *RawProviderServer) ConfigureProvider(ctx context.Context, req *tfprotov
 			Summary:  "Provider configuration: failed to extract 'config_path' value",
 			Detail:   err.Error(),
 		})
-		return response, nil
-	}
-
-	providerEnabled := true
-	if !providerConfig["experiments"].IsNull() && providerConfig["experiments"].IsKnown() {
-		var experimentsBlock []tftypes.Value
-		err = providerConfig["experiments"].As(&experimentsBlock)
-		if err != nil {
-			// invalid configuration schema - this shouldn't happen, bail out now
-			response.Diagnostics = append(response.Diagnostics, &tfprotov5.Diagnostic{
-				Severity: tfprotov5.DiagnosticSeverityError,
-				Summary:  "Provider configuration: failed to extract 'experiments' value",
-				Detail:   err.Error(),
-			})
-			return response, nil
-		}
-		if len(experimentsBlock) > 0 {
-			var experimentsObj map[string]tftypes.Value
-			err := experimentsBlock[0].As(&experimentsObj)
-			if err != nil {
-				// invalid configuration schema - this shouldn't happen, bail out now
-				response.Diagnostics = append(response.Diagnostics, &tfprotov5.Diagnostic{
-					Severity: tfprotov5.DiagnosticSeverityError,
-					Summary:  "Provider configuration: failed to extract 'experiments' value",
-					Detail:   err.Error(),
-				})
-				return response, nil
-			}
-			if !experimentsObj["manifest_resource"].IsNull() && experimentsObj["manifest_resource"].IsKnown() {
-				err = experimentsObj["manifest_resource"].As(&providerEnabled)
-				if err != nil {
-					// invalid attribute type - this shouldn't happen, bail out for now
-					response.Diagnostics = append(response.Diagnostics, &tfprotov5.Diagnostic{
-						Severity: tfprotov5.DiagnosticSeverityError,
-						Summary:  "Provider configuration: failed to extract 'manifest_resource' value",
-						Detail:   err.Error(),
-					})
-					return response, nil
-				}
-			}
-		}
-	}
-	if v := os.Getenv("TF_X_KUBERNETES_MANIFEST_RESOURCE"); v != "" {
-		providerEnabled, err = strconv.ParseBool(v)
-		if err != nil {
-			if err != nil {
-				// invalid attribute type - this shouldn't happen, bail out for now
-				response.Diagnostics = append(response.Diagnostics, &tfprotov5.Diagnostic{
-					Severity: tfprotov5.DiagnosticSeverityError,
-					Summary:  "Provider configuration: failed to parse boolean from `TF_X_KUBERNETES_MANIFEST_RESOURCE` env var",
-					Detail:   err.Error(),
-				})
-				return response, nil
-			}
-		}
-	}
-	s.providerEnabled = providerEnabled
-
-	if !providerEnabled {
-		// Configure should be a noop when not enabled in the provider block
 		return response, nil
 	}
 
@@ -137,9 +84,7 @@ func (s *RawProviderServer) ConfigureProvider(ctx context.Context, req *tfprotov
 			})
 			return response, nil
 		}
-	}
-	// check environment - this overrides any value found in provider configuration
-	if configPathEnv, ok := os.LookupEnv("KUBE_CONFIG_PATH"); ok && configPathEnv != "" {
+	} else if configPathEnv, ok := os.LookupEnv("KUBE_CONFIG_PATH"); ok && configPathEnv != "" {
 		configPath = configPathEnv
 	}
 	if len(configPath) > 0 {
@@ -149,7 +94,7 @@ func (s *RawProviderServer) ConfigureProvider(ctx context.Context, req *tfprotov
 		}
 		if err != nil {
 			diags = append(diags, &tfprotov5.Diagnostic{
-				Severity: tfprotov5.DiagnosticSeverityInvalid,
+				Severity: tfprotov5.DiagnosticSeverityError,
 				Summary:  "Invalid attribute in provider configuration",
 				Detail:   fmt.Sprintf("'config_path' refers to an invalid path: %q: %v", configPathAbs, err),
 			})
@@ -175,12 +120,10 @@ func (s *RawProviderServer) ConfigureProvider(ctx context.Context, req *tfprotov
 			p.As(&pp)
 			precedence = append(precedence, pp)
 		}
-	}
-	//
-	// check environment for KUBE_CONFIG_PATHS
-	if configPathsEnv, ok := os.LookupEnv("KUBE_CONFIG_PATHS"); ok && configPathsEnv != "" {
+	} else if configPathsEnv, ok := os.LookupEnv("KUBE_CONFIG_PATHS"); ok && configPathsEnv != "" {
 		precedence = filepath.SplitList(configPathsEnv)
 	}
+
 	if len(precedence) > 0 {
 		for i, p := range precedence {
 			absPath, err := homedir.Expand(p)
@@ -189,7 +132,7 @@ func (s *RawProviderServer) ConfigureProvider(ctx context.Context, req *tfprotov
 			}
 			if err != nil {
 				diags = append(diags, &tfprotov5.Diagnostic{
-					Severity: tfprotov5.DiagnosticSeverityInvalid,
+					Severity: tfprotov5.DiagnosticSeverityError,
 					Summary:  "Invalid attribute in provider configuration",
 					Detail:   fmt.Sprintf("'config_paths' refers to an invalid path: %q: %v", absPath, err),
 				})
@@ -205,22 +148,21 @@ func (s *RawProviderServer) ConfigureProvider(ctx context.Context, req *tfprotov
 	if !providerConfig["client_certificate"].IsNull() && providerConfig["client_certificate"].IsKnown() {
 		err = providerConfig["client_certificate"].As(&clientCertificate)
 		if err != nil {
-			diags = append(diags, &tfprotov5.Diagnostic{
-				Severity: tfprotov5.DiagnosticSeverityInvalid,
+			response.Diagnostics = append(diags, &tfprotov5.Diagnostic{
+				Severity: tfprotov5.DiagnosticSeverityError,
 				Summary:  "Invalid attribute in provider configuration",
 				Detail:   "'client_certificate' type cannot be asserted: " + err.Error(),
 			})
 			return response, nil
 		}
-	}
-	if clientCrtEnv, ok := os.LookupEnv("KUBE_CLIENT_CERT_DATA"); ok && clientCrtEnv != "" {
+	} else if clientCrtEnv, ok := os.LookupEnv("KUBE_CLIENT_CERT_DATA"); ok && clientCrtEnv != "" {
 		clientCertificate = clientCrtEnv
 	}
 	if len(clientCertificate) > 0 {
 		ccPEM, _ := pem.Decode([]byte(clientCertificate))
 		if ccPEM == nil || ccPEM.Type != "CERTIFICATE" {
 			diags = append(diags, &tfprotov5.Diagnostic{
-				Severity: tfprotov5.DiagnosticSeverityInvalid,
+				Severity: tfprotov5.DiagnosticSeverityError,
 				Summary:  "Invalid attribute in provider configuration",
 				Detail:   "'client_certificate' is not a valid PEM encoded certificate",
 			})
@@ -242,15 +184,14 @@ func (s *RawProviderServer) ConfigureProvider(ctx context.Context, req *tfprotov
 			})
 			return response, nil
 		}
-	}
-	if clusterCAEnv, ok := os.LookupEnv("KUBE_CLUSTER_CA_CERT_DATA"); ok && clusterCAEnv != "" {
+	} else if clusterCAEnv, ok := os.LookupEnv("KUBE_CLUSTER_CA_CERT_DATA"); ok && clusterCAEnv != "" {
 		clusterCaCertificate = clusterCAEnv
 	}
 	if len(clusterCaCertificate) > 0 {
 		ca, _ := pem.Decode([]byte(clusterCaCertificate))
 		if ca == nil || ca.Type != "CERTIFICATE" {
 			diags = append(diags, &tfprotov5.Diagnostic{
-				Severity: tfprotov5.DiagnosticSeverityInvalid,
+				Severity: tfprotov5.DiagnosticSeverityError,
 				Summary:  "Invalid attribute in provider configuration",
 				Detail:   "'cluster_ca_certificate' is not a valid PEM encoded certificate",
 			})
@@ -272,12 +213,11 @@ func (s *RawProviderServer) ConfigureProvider(ctx context.Context, req *tfprotov
 			})
 			return response, nil
 		}
-	}
-	if insecureEnv, ok := os.LookupEnv("KUBE_INSECURE"); ok && insecureEnv != "" {
+	} else if insecureEnv, ok := os.LookupEnv("KUBE_INSECURE"); ok && insecureEnv != "" {
 		iv, err := strconv.ParseBool(insecureEnv)
 		if err != nil {
 			diags = append(diags, &tfprotov5.Diagnostic{
-				Severity: tfprotov5.DiagnosticSeverityInvalid,
+				Severity: tfprotov5.DiagnosticSeverityError,
 				Summary:  "Invalid provider configuration",
 				Detail:   "Environment variable KUBE_INSECURE contains invalid value: " + err.Error(),
 			})
@@ -302,8 +242,7 @@ func (s *RawProviderServer) ConfigureProvider(ctx context.Context, req *tfprotov
 			return response, nil
 		}
 		overrides.ClusterInfo.TLSServerName = tlsServerName
-	}
-	if tlsServerName, ok := os.LookupEnv("KUBE_TLS_SERVER_NAME"); ok && tlsServerName != "" {
+	} else if tlsServerName, ok := os.LookupEnv("KUBE_TLS_SERVER_NAME"); ok && tlsServerName != "" {
 		overrides.ClusterInfo.TLSServerName = tlsServerName
 	}
 
@@ -325,24 +264,22 @@ func (s *RawProviderServer) ConfigureProvider(ctx context.Context, req *tfprotov
 			})
 			return response, nil
 		}
-	}
-	// check environment - this overrides any value found in provider configuration
-	if hostEnv, ok := os.LookupEnv("KUBE_HOST"); ok && hostEnv != "" {
+	} else if hostEnv, ok := os.LookupEnv("KUBE_HOST"); ok && hostEnv != "" {
 		host = hostEnv
 	}
 	if len(host) > 0 {
 		_, err = url.ParseRequestURI(host)
 		if err != nil {
 			diags = append(diags, &tfprotov5.Diagnostic{
-				Severity: tfprotov5.DiagnosticSeverityInvalid,
+				Severity: tfprotov5.DiagnosticSeverityError,
 				Summary:  "Invalid attribute in provider configuration",
 				Detail:   "'host' is not a valid URL",
 			})
 		}
 		hostURL, _, err := rest.DefaultServerURL(host, "", apimachineryschema.GroupVersion{}, defaultTLS)
 		if err != nil {
-			diags = append(diags, &tfprotov5.Diagnostic{
-				Severity: tfprotov5.DiagnosticSeverityInvalid,
+			response.Diagnostics = append(diags, &tfprotov5.Diagnostic{
+				Severity: tfprotov5.DiagnosticSeverityError,
 				Summary:  "Invalid attribute in provider configuration",
 				Detail:   "Invalid value for 'host': " + err.Error(),
 			})
@@ -369,16 +306,14 @@ func (s *RawProviderServer) ConfigureProvider(ctx context.Context, req *tfprotov
 			})
 			return response, nil
 		}
-	}
-	// check environment - this overrides any value found in provider configuration
-	if clientKeyEnv, ok := os.LookupEnv("KUBE_CLIENT_KEY_DATA"); ok && clientKeyEnv != "" {
+	} else if clientKeyEnv, ok := os.LookupEnv("KUBE_CLIENT_KEY_DATA"); ok && clientKeyEnv != "" {
 		clientKey = clientKeyEnv
 	}
 	if len(clientKey) > 0 {
 		ck, _ := pem.Decode([]byte(clientKey))
 		if ck == nil || !strings.Contains(ck.Type, "PRIVATE KEY") {
 			diags = append(diags, &tfprotov5.Diagnostic{
-				Severity: tfprotov5.DiagnosticSeverityInvalid,
+				Severity: tfprotov5.DiagnosticSeverityError,
 				Summary:  "Invalid attribute in provider configuration",
 				Detail:   "'client_key' is not a valid PEM encoded private key",
 			})
@@ -406,8 +341,7 @@ func (s *RawProviderServer) ConfigureProvider(ctx context.Context, req *tfprotov
 			return response, nil
 		}
 		overrides.CurrentContext = cfgContext
-	}
-	if cfgContext, ok := os.LookupEnv("KUBE_CTX"); ok && cfgContext != "" {
+	} else if cfgContext, ok := os.LookupEnv("KUBE_CTX"); ok && cfgContext != "" {
 		overrides.CurrentContext = cfgContext
 	}
 
@@ -428,8 +362,7 @@ func (s *RawProviderServer) ConfigureProvider(ctx context.Context, req *tfprotov
 			return response, nil
 		}
 		overrides.Context.Cluster = cfgCtxCluster
-	}
-	if cfgCtxCluster, ok := os.LookupEnv("KUBE_CTX_CLUSTER"); ok && cfgCtxCluster != "" {
+	} else if cfgCtxCluster, ok := os.LookupEnv("KUBE_CTX_CLUSTER"); ok && cfgCtxCluster != "" {
 		overrides.Context.Cluster = cfgCtxCluster
 	}
 
@@ -450,8 +383,7 @@ func (s *RawProviderServer) ConfigureProvider(ctx context.Context, req *tfprotov
 		if cfgContextAuthInfo != nil {
 			overrides.Context.AuthInfo = *cfgContextAuthInfo
 		}
-	}
-	if cfgContextAuthInfoEnv, ok := os.LookupEnv("KUBE_CTX_AUTH_INFO"); ok && cfgContextAuthInfoEnv != "" {
+	} else if cfgContextAuthInfoEnv, ok := os.LookupEnv("KUBE_CTX_AUTH_INFO"); ok && cfgContextAuthInfoEnv != "" {
 		overrides.Context.AuthInfo = cfgContextAuthInfoEnv
 	}
 
@@ -468,8 +400,7 @@ func (s *RawProviderServer) ConfigureProvider(ctx context.Context, req *tfprotov
 			return response, nil
 		}
 		overrides.AuthInfo.Username = username
-	}
-	if username, ok := os.LookupEnv("KUBE_USERNAME"); ok && username != "" {
+	} else if username, ok := os.LookupEnv("KUBE_USERNAME"); ok && username != "" {
 		overrides.AuthInfo.Username = username
 	}
 
@@ -486,8 +417,7 @@ func (s *RawProviderServer) ConfigureProvider(ctx context.Context, req *tfprotov
 			return response, nil
 		}
 		overrides.AuthInfo.Password = password
-	}
-	if password, ok := os.LookupEnv("KUBE_PASSWORD"); ok && password != "" {
+	} else if password, ok := os.LookupEnv("KUBE_PASSWORD"); ok && password != "" {
 		overrides.AuthInfo.Password = password
 	}
 
@@ -504,8 +434,7 @@ func (s *RawProviderServer) ConfigureProvider(ctx context.Context, req *tfprotov
 			return response, nil
 		}
 		overrides.AuthInfo.Token = token
-	}
-	if token, ok := os.LookupEnv("KUBE_TOKEN"); ok && token != "" {
+	} else if token, ok := os.LookupEnv("KUBE_TOKEN"); ok && token != "" {
 		overrides.AuthInfo.Token = token
 	}
 
@@ -522,8 +451,7 @@ func (s *RawProviderServer) ConfigureProvider(ctx context.Context, req *tfprotov
 			return response, nil
 		}
 		overrides.ClusterDefaults.ProxyURL = proxyURL
-	}
-	if proxyUrl, ok := os.LookupEnv("KUBE_PROXY_URL"); ok && proxyUrl != "" {
+	} else if proxyURL, ok := os.LookupEnv("KUBE_PROXY_URL"); ok && proxyURL != "" {
 		overrides.ClusterDefaults.ProxyURL = proxyURL
 	}
 
@@ -673,13 +601,6 @@ func (s *RawProviderServer) ConfigureProvider(ctx context.Context, req *tfprotov
 }
 
 func (s *RawProviderServer) canExecute() (resp []*tfprotov5.Diagnostic) {
-	if !s.providerEnabled {
-		resp = append(resp, &tfprotov5.Diagnostic{
-			Severity: tfprotov5.DiagnosticSeverityError,
-			Summary:  "Experimental feature not enabled.",
-			Detail:   "The `kubernetes_manifest` resource is an experimental feature and must be explicitly enabled in the provider configuration block.",
-		})
-	}
 	if semver.IsValid(s.hostTFVersion) && semver.Compare(s.hostTFVersion, minTFVersion) < 0 {
 		resp = append(resp, &tfprotov5.Diagnostic{
 			Severity: tfprotov5.DiagnosticSeverityError,

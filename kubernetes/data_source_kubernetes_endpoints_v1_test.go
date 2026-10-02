@@ -1,6 +1,10 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
+// NOTE this API has been deprecated and the resource should be removed
+// in the next major provider version.
+//
+//nolint:all
 package kubernetes
 
 import (
@@ -8,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -20,7 +24,6 @@ func TestAccKubernetesDataSourceEndpointsV1_basic(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesEndpointV1Destroy,
 		Steps: []resource.TestStep{
@@ -60,6 +63,26 @@ func TestAccKubernetesDataSourceEndpointsV1_basic(t *testing.T) {
 	})
 }
 
+func TestAccKubernetesDataSourceEndpointsV1_not_found(t *testing.T) {
+	dataSourceName := "data.kubernetes_endpoints_v1.test"
+	name := fmt.Sprintf("ceci-n.est-pas-une-endpoint-%s", acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum))
+
+	resource.ParallelTest(t, resource.TestCase{
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckKubernetesEndpointV1Destroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccKubernetesDataSourceEndpointsV1_nonexistent(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(dataSourceName, "metadata.0.name", name),
+					resource.TestCheckResourceAttr(dataSourceName, "subset.#", "0"),
+				),
+			},
+		},
+	})
+}
+
 func testAccKubernetesDataSourceEndpointsV1_read() string {
 	return `data "kubernetes_endpoints_v1" "test" {
   metadata {
@@ -67,4 +90,13 @@ func testAccKubernetesDataSourceEndpointsV1_read() string {
   }
 }
 `
+}
+
+func testAccKubernetesDataSourceEndpointsV1_nonexistent(name string) string {
+	return fmt.Sprintf(`data "kubernetes_endpoints_v1" "test" {
+  metadata {
+    name = "%s"
+  }
+}
+`, name)
 }

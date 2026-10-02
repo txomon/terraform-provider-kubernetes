@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -16,16 +16,18 @@ import (
 	pkgApi "k8s.io/apimachinery/pkg/types"
 )
 
-func resourceKubernetesRoleV1() *schema.Resource {
+func resourceKubernetesRoleV1(deprecationMessage string) *schema.Resource {
 	return &schema.Resource{
-		CreateContext: resourceKubernetesRoleV1Create,
-		ReadContext:   resourceKubernetesRoleV1Read,
-		UpdateContext: resourceKubernetesRoleV1Update,
-		DeleteContext: resourceKubernetesRoleV1Delete,
+		Description:        "A role contains rules that represent a set of permissions. Permissions are purely additive (there are no “deny” rules).",
+		CreateContext:      resourceKubernetesRoleV1Create,
+		ReadContext:        resourceKubernetesRoleV1Read,
+		DeprecationMessage: deprecationMessage,
+		UpdateContext:      resourceKubernetesRoleV1Update,
+		DeleteContext:      resourceKubernetesRoleV1Delete,
 		Importer: &schema.ResourceImporter{
-			StateContext: schema.ImportStatePassthroughContext,
+			StateContext: resourceIdentityImportNamespaced,
 		},
-
+		Identity: resourceIdentitySchemaNamespaced(),
 		Schema: map[string]*schema.Schema{
 			"metadata": metadataSchemaRBAC("role", true, true),
 			"rule": {
@@ -89,7 +91,7 @@ func resourceKubernetesRoleV1Create(ctx context.Context, d *schema.ResourceData,
 	}
 
 	log.Printf("[INFO] Submitted new role: %#v", out)
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 
 	return resourceKubernetesRoleV1Read(ctx, d, meta)
 }
@@ -108,7 +110,7 @@ func resourceKubernetesRoleV1Read(ctx context.Context, d *schema.ResourceData, m
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -130,7 +132,10 @@ func resourceKubernetesRoleV1Read(ctx context.Context, d *schema.ResourceData, m
 	if err != nil {
 		return diag.FromErr(err)
 	}
-
+	err = setResourceIdentityNamespaced(d, "rbac.authorization.k8s.io/v1", "Role", namespace, name)
+	if err != nil {
+		return diag.FromErr(err)
+	}
 	return nil
 }
 
@@ -140,7 +145,7 @@ func resourceKubernetesRoleV1Update(ctx context.Context, d *schema.ResourceData,
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -165,7 +170,7 @@ func resourceKubernetesRoleV1Update(ctx context.Context, d *schema.ResourceData,
 		return diag.Errorf("Failed to update role: %s", err)
 	}
 	log.Printf("[INFO] Submitted updated role: %#v", out)
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 
 	return resourceKubernetesRoleV1Read(ctx, d, meta)
 }
@@ -176,7 +181,7 @@ func resourceKubernetesRoleV1Delete(ctx context.Context, d *schema.ResourceData,
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -201,7 +206,7 @@ func resourceKubernetesRoleV1Exists(ctx context.Context, d *schema.ResourceData,
 		return false, err
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return false, err
 	}

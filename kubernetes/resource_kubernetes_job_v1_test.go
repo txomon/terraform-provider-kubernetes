@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -10,10 +10,14 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
+	"github.com/hashicorp/terraform-plugin-testing/statecheck"
+	"github.com/hashicorp/terraform-plugin-testing/tfversion"
 )
 
 func TestAccKubernetesJobV1_wait_for_completion(t *testing.T) {
@@ -23,14 +27,7 @@ func TestAccKubernetesJobV1_wait_for_completion(t *testing.T) {
 	resourceName := "kubernetes_job_v1.test"
 
 	resource.ParallelTest(t, resource.TestCase{
-		PreCheck:      func() { testAccPreCheck(t) },
-		IDRefreshName: resourceName,
-		IDRefreshIgnore: []string{
-			"metadata.0.resource_version",
-			"spec.0.selector.0.match_expressions.#",
-			"spec.0.template.0.spec.0.container.0.resources.0.limits.#",
-			"spec.0.template.0.spec.0.container.0.resources.0.requests.#",
-		},
+		PreCheck:          func() { testAccPreCheck(t) },
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesJobV1Destroy,
 		Steps: []resource.TestStep{
@@ -48,6 +45,42 @@ func TestAccKubernetesJobV1_wait_for_completion(t *testing.T) {
 	})
 }
 
+func TestAccKubernetesJobV1_identity(t *testing.T) {
+	name := fmt.Sprintf("tf-acc-test-%s", acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum))
+	imageName := busyboxImage
+	resourceName := "kubernetes_job_v1.test"
+
+	resource.ParallelTest(t, resource.TestCase{
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckKubernetesJobV1Destroy,
+		TerraformVersionChecks: []tfversion.TerraformVersionCheck{
+			tfversion.SkipBelow(tfversion.Version1_12_0),
+		},
+
+		Steps: []resource.TestStep{
+			{
+				Config: testAccKubernetesJobV1Config_basic(name, imageName),
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectIdentity(
+						resourceName, map[string]knownvalue.Check{
+							"namespace":   knownvalue.StringExact("default"),
+							"name":        knownvalue.StringExact(name),
+							"api_version": knownvalue.StringExact("batch/v1"),
+							"kind":        knownvalue.StringExact("Job"),
+						},
+					),
+				},
+			},
+			{
+				ResourceName:    resourceName,
+				ImportState:     true,
+				ImportStateKind: resource.ImportBlockWithResourceIdentity,
+			},
+		},
+	})
+}
+
 func TestAccKubernetesJobV1_basic(t *testing.T) {
 	var conf batchv1.Job
 	name := fmt.Sprintf("tf-acc-test-%s", acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum))
@@ -55,9 +88,11 @@ func TestAccKubernetesJobV1_basic(t *testing.T) {
 	resourceName := "kubernetes_job_v1.test"
 
 	resource.ParallelTest(t, resource.TestCase{
-		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
+		PreCheck: func() {
+			testAccPreCheck(t)
+			skipIfClusterVersionLessThan(t, "1.26.0")
+		},
+
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesJobV1Destroy,
 		Steps: []resource.TestStep{
@@ -77,6 +112,16 @@ func TestAccKubernetesJobV1_basic(t *testing.T) {
 					resource.TestCheckResourceAttr(resourceName, "spec.0.template.0.spec.0.container.0.name", "hello"),
 					resource.TestCheckResourceAttr(resourceName, "spec.0.template.0.spec.0.container.0.image", imageName),
 					resource.TestCheckResourceAttr(resourceName, "wait_for_completion", "false"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.pod_failure_policy.0.rule.#", "2"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.pod_failure_policy.0.rule.0.action", "FailJob"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.pod_failure_policy.0.rule.0.on_exit_codes.0.container_name", "hello"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.pod_failure_policy.0.rule.0.on_exit_codes.0.values.#", "3"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.pod_failure_policy.0.rule.0.on_exit_codes.0.values.0", "1"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.pod_failure_policy.0.rule.0.on_exit_codes.0.values.1", "2"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.pod_failure_policy.0.rule.0.on_exit_codes.0.values.2", "42"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.pod_failure_policy.0.rule.1.action", "Ignore"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.pod_failure_policy.0.rule.1.on_pod_condition.0.type", "DisruptionTarget"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.pod_failure_policy.0.rule.1.on_pod_condition.0.status", "False"),
 				),
 			},
 			{
@@ -112,9 +157,11 @@ func TestAccKubernetesJobV1_update(t *testing.T) {
 	resourceName := "kubernetes_job_v1.test"
 
 	resource.ParallelTest(t, resource.TestCase{
-		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
+		PreCheck: func() {
+			testAccPreCheck(t)
+			skipIfClusterVersionLessThan(t, "1.26.0")
+		},
+
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesJobV1Destroy,
 		Steps: []resource.TestStep{
@@ -131,6 +178,16 @@ func TestAccKubernetesJobV1_update(t *testing.T) {
 					resource.TestCheckResourceAttr(resourceName, "spec.0.template.0.spec.0.container.0.image", imageName),
 					resource.TestCheckResourceAttr(resourceName, "wait_for_completion", "false"),
 					resource.TestCheckResourceAttr(resourceName, "spec.0.manual_selector", "false"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.pod_failure_policy.0.rule.#", "2"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.pod_failure_policy.0.rule.0.action", "FailJob"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.pod_failure_policy.0.rule.0.on_exit_codes.0.container_name", "hello"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.pod_failure_policy.0.rule.0.on_exit_codes.0.values.#", "3"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.pod_failure_policy.0.rule.0.on_exit_codes.0.values.0", "1"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.pod_failure_policy.0.rule.0.on_exit_codes.0.values.1", "2"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.pod_failure_policy.0.rule.0.on_exit_codes.0.values.2", "42"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.pod_failure_policy.0.rule.1.action", "Ignore"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.pod_failure_policy.0.rule.1.on_pod_condition.0.type", "DisruptionTarget"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.pod_failure_policy.0.rule.1.on_pod_condition.0.status", "False"),
 				),
 			},
 			{
@@ -192,11 +249,7 @@ func TestAccKubernetesJobV1_ttl_seconds_after_finished(t *testing.T) {
 	resourceName := "kubernetes_job_v1.test"
 
 	resource.ParallelTest(t, resource.TestCase{
-		PreCheck:      func() { testAccPreCheck(t); skipIfClusterVersionLessThan(t, "1.21.0") },
-		IDRefreshName: resourceName,
-		IDRefreshIgnore: []string{
-			"spec.0.selector.0.match_expressions.#",
-		},
+		PreCheck:          func() { testAccPreCheck(t); skipIfClusterVersionLessThan(t, "1.21.0") },
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesJobV1Destroy,
 		Steps: []resource.TestStep{
@@ -242,7 +295,6 @@ func testAccCheckKubernetesJobV1ForceNew(old, new *batchv1.Job, wantNew bool) re
 
 func testAccCheckKubernetesJobV1Destroy(s *terraform.State) error {
 	conn, err := testAccProvider.Meta().(KubeClientsets).MainClientset()
-
 	if err != nil {
 		return err
 	}
@@ -253,7 +305,7 @@ func testAccCheckKubernetesJobV1Destroy(s *terraform.State) error {
 			continue
 		}
 
-		namespace, name, err := idParts(rs.Primary.ID)
+		namespace, name, err := IdParts(rs.Primary.ID)
 		if err != nil {
 			return err
 		}
@@ -282,7 +334,7 @@ func testAccCheckKubernetesJobV1Exists(n string, obj *batchv1.Job) resource.Test
 		}
 		ctx := context.TODO()
 
-		namespace, name, err := idParts(rs.Primary.ID)
+		namespace, name, err := IdParts(rs.Primary.ID)
 		if err != nil {
 			return err
 		}
@@ -307,6 +359,23 @@ func testAccKubernetesJobV1Config_basic(name, imageName string) string {
     backoff_limit           = 10
     completions             = 4
     parallelism             = 2
+    pod_failure_policy {
+      rule {
+        action = "FailJob"
+        on_exit_codes {
+          container_name = "hello"
+          operator       = "In"
+          values         = [1, 2, 42]
+        }
+      }
+      rule {
+        action = "Ignore"
+        on_pod_condition {
+          status = "False"
+          type   = "DisruptionTarget"
+        }
+      }
+    }
     template {
       metadata {}
       spec {
@@ -334,6 +403,23 @@ func testAccKubernetesJobV1Config_updateMutableFields(name, imageName, activeDea
     completions             = 4
     manual_selector         = %s
     parallelism             = %s
+    pod_failure_policy {
+      rule {
+        action = "FailJob"
+        on_exit_codes {
+          container_name = "hello"
+          operator       = "In"
+          values         = [1, 2, 42]
+        }
+      }
+      rule {
+        action = "Ignore"
+        on_pod_condition {
+          status = "False"
+          type   = "DisruptionTarget"
+        }
+      }
+    }
     template {
       metadata {}
       spec {

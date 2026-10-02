@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -132,7 +132,7 @@ func TestUpgradeTemplatePodSpecWithResourcesFieldV0(t *testing.T) {
 		}},
 	}
 
-	actual, _ := upgradeTemplatePodSpecWithResourcesFieldV0(context.TODO(), v0, nil)
+	actual := upgradeTemplatePodSpecWithResourcesFieldV0(context.TODO(), v0, nil)
 
 	if !reflect.DeepEqual(v1, actual) {
 		t.Fatalf("\n\nexpected:\n\n%#v\n\ngot:\n\n%#v\n\n", v1, actual)
@@ -190,7 +190,7 @@ func TestUpgradeTemplatePodSpecWithResourcesFieldV0_empty(t *testing.T) {
 		}},
 	}
 
-	actual, _ := upgradeTemplatePodSpecWithResourcesFieldV0(context.TODO(), v0, nil)
+	actual := upgradeTemplatePodSpecWithResourcesFieldV0(context.TODO(), v0, nil)
 
 	if !reflect.DeepEqual(v1, actual) {
 		t.Fatalf("\n\nexpected:\n\n%#v\n\ngot:\n\n%#v\n\n", v1, actual)

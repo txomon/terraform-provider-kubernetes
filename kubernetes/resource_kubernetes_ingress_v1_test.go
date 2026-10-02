@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -9,11 +9,15 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 
 	networking "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
+	"github.com/hashicorp/terraform-plugin-testing/statecheck"
+	"github.com/hashicorp/terraform-plugin-testing/tfversion"
 )
 
 func TestAccKubernetesIngressV1_serviceBackend(t *testing.T) {
@@ -26,8 +30,7 @@ func TestAccKubernetesIngressV1_serviceBackend(t *testing.T) {
 			testAccPreCheck(t)
 			skipIfClusterVersionLessThan(t, "1.22.0")
 		},
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
+
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesIngressV1Destroy,
 		Steps: []resource.TestStep{
@@ -82,8 +85,7 @@ func TestAccKubernetesIngressV1_resourceBackend(t *testing.T) {
 			testAccPreCheck(t)
 			skipIfClusterVersionLessThan(t, "1.22.0")
 		},
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
+
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesIngressV1Destroy,
 		Steps: []resource.TestStep{
@@ -126,10 +128,8 @@ func TestAccKubernetesIngressV1_TLS(t *testing.T) {
 			testAccPreCheck(t)
 			skipIfClusterVersionLessThan(t, "1.22.0")
 		},
-		IDRefreshName:     resourceName,
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesIngressV1Destroy,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		Steps: []resource.TestStep{
 			{
 				Config: testAccKubernetesIngressV1Config_TLS(name),
@@ -164,6 +164,37 @@ func TestAccKubernetesIngressV1_TLS(t *testing.T) {
 	})
 }
 
+func TestAccKubernetesIngressV1_emptyTLS(t *testing.T) {
+	var conf networking.Ingress
+	name := fmt.Sprintf("tf-acc-test-%s", acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum))
+	resourceName := "kubernetes_ingress_v1.test"
+
+	resource.ParallelTest(t, resource.TestCase{
+		PreCheck: func() {
+			testAccPreCheck(t)
+			skipIfClusterVersionLessThan(t, "1.22.0")
+		},
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckKubernetesIngressV1Destroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccKubernetesIngressV1Config_emptyTLS(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckKubernetesIngressV1Exists(resourceName, &conf),
+					resource.TestCheckResourceAttr(resourceName, "metadata.0.name", name),
+					resource.TestCheckResourceAttrSet(resourceName, "metadata.0.generation"),
+					resource.TestCheckResourceAttrSet(resourceName, "metadata.0.resource_version"),
+					resource.TestCheckResourceAttrSet(resourceName, "metadata.0.uid"),
+					resource.TestCheckResourceAttr(resourceName, "spec.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.tls.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.tls.0.hosts.#", "0"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.tls.0.secret_name", ""),
+				),
+			},
+		},
+	})
+}
+
 func TestAccKubernetesIngressV1_InternalKey(t *testing.T) {
 	var conf networking.Ingress
 	name := fmt.Sprintf("tf-acc-test-%s", acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum))
@@ -174,8 +205,7 @@ func TestAccKubernetesIngressV1_InternalKey(t *testing.T) {
 			testAccPreCheck(t)
 			skipIfClusterVersionLessThan(t, "1.22.0")
 		},
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
+
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesIngressV1Destroy,
 		Steps: []resource.TestStep{
@@ -221,8 +251,7 @@ func TestAccKubernetesIngressV1_WaitForLoadBalancerGoogleCloud(t *testing.T) {
 			skipIfClusterVersionLessThan(t, "1.22.0")
 			skipIfNotRunningInGke(t)
 		},
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
+
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesIngressV1Destroy,
 		Steps: []resource.TestStep{
@@ -247,8 +276,7 @@ func TestAccKubernetesIngressV1_hostOnlyRule(t *testing.T) {
 			testAccPreCheck(t)
 			skipIfClusterVersionLessThan(t, "1.22.0")
 		},
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
+
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesIngressV1Destroy,
 		Steps: []resource.TestStep{
@@ -282,8 +310,7 @@ func TestAccKubernetesIngressV1_multipleRulesDifferentHosts(t *testing.T) {
 			testAccPreCheck(t)
 			skipIfClusterVersionLessThan(t, "1.22.0")
 		},
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
+
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesIngressV1Destroy,
 		Steps: []resource.TestStep{
@@ -331,8 +358,7 @@ func TestAccKubernetesIngressV1_defaultIngressClass(t *testing.T) {
 			testAccPreCheck(t)
 			skipIfClusterVersionLessThan(t, "1.22.0")
 		},
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
+
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesIngressV1Destroy,
 		Steps: []resource.TestStep{
@@ -349,9 +375,46 @@ func TestAccKubernetesIngressV1_defaultIngressClass(t *testing.T) {
 	})
 }
 
+func TestAccKubernetesIngressV1_identity(t *testing.T) {
+	name := fmt.Sprintf("tf-acc-test-%s", acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum))
+	ingressClass := "identity-ingress-class"
+	resourceName := "kubernetes_ingress_v1.test"
+
+	resource.ParallelTest(t, resource.TestCase{
+		PreCheck: func() {
+			testAccPreCheck(t)
+			skipIfClusterVersionLessThan(t, "1.22.0")
+		},
+		TerraformVersionChecks: []tfversion.TerraformVersionCheck{
+			tfversion.SkipBelow(tfversion.Version1_12_0),
+		},
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckKubernetesIngressV1Destroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccKubernetesIngressV1Config_identity(ingressClass, name),
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectIdentity(
+						resourceName, map[string]knownvalue.Check{
+							"namespace":   knownvalue.StringExact("default"),
+							"name":        knownvalue.StringExact(name),
+							"api_version": knownvalue.StringExact("networking.k8s.io/v1"),
+							"kind":        knownvalue.StringExact("Ingress"),
+						},
+					),
+				},
+			},
+			{
+				ResourceName:    resourceName,
+				ImportState:     true,
+				ImportStateKind: resource.ImportBlockWithResourceIdentity,
+			},
+		},
+	})
+}
+
 func testAccCheckKubernetesIngressV1Destroy(s *terraform.State) error {
 	conn, err := testAccProvider.Meta().(KubeClientsets).MainClientset()
-
 	if err != nil {
 		return err
 	}
@@ -362,7 +425,7 @@ func testAccCheckKubernetesIngressV1Destroy(s *terraform.State) error {
 			continue
 		}
 
-		namespace, name, err := idParts(rs.Primary.ID)
+		namespace, name, err := IdParts(rs.Primary.ID)
 		if err != nil {
 			return err
 		}
@@ -391,7 +454,7 @@ func testAccCheckKubernetesIngressV1Exists(n string, obj *networking.Ingress) re
 		}
 		ctx := context.TODO()
 
-		namespace, name, err := idParts(rs.Primary.ID)
+		namespace, name, err := IdParts(rs.Primary.ID)
 		if err != nil {
 			return err
 		}
@@ -536,6 +599,26 @@ func testAccKubernetesIngressV1Config_TLS_modified(name string) string {
     tls {
       hosts       = ["host1", "host2"]
       secret_name = "super-sekret"
+    }
+  }
+}`, name)
+}
+
+func testAccKubernetesIngressV1Config_emptyTLS(name string) string {
+	return fmt.Sprintf(`resource "kubernetes_ingress_v1" "test" {
+  metadata {
+    name = "%s"
+  }
+  spec {
+    default_backend {
+      service {
+        name = "app1"
+        port {
+          number = 443
+        }
+      }
+    }
+    tls {
     }
   }
 }`, name)
@@ -750,6 +833,48 @@ func testAccKubernetesIngressV1Config_multipleRulesDifferentHosts(name string) s
 }
 
 func testAccKubernetesIngressV1Config_defaultIngressClass(ingressClass, name string) string {
+	return fmt.Sprintf(`resource "kubernetes_ingress_class_v1" "test" {
+  metadata {
+    name = "%s"
+    labels = {
+      "app.kubernetes.io/component" = "controller"
+    }
+    annotations = {
+      "ingressclass.kubernetes.io/is-default-class" = "true"
+    }
+  }
+  spec {
+    controller = "k8s.io/ingress-nginx"
+  }
+}
+
+resource "kubernetes_ingress_v1" "test" {
+  metadata {
+    name = "%s"
+  }
+  spec {
+    rule {
+      host = "server.domain.com"
+      http {
+        path {
+          backend {
+            service {
+              name = "app1"
+              port {
+                number = 8080
+              }
+            }
+          }
+          path = "/app1/*"
+        }
+      }
+    }
+  }
+  depends_on = ["kubernetes_ingress_class_v1.test"]
+}`, ingressClass, name)
+}
+
+func testAccKubernetesIngressV1Config_identity(ingressClass, name string) string {
 	return fmt.Sprintf(`resource "kubernetes_ingress_class_v1" "test" {
   metadata {
     name = "%s"

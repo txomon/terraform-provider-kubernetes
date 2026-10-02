@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package main
@@ -14,14 +14,16 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 	"github.com/hashicorp/terraform-exec/tfexec"
-	tf5server "github.com/hashicorp/terraform-plugin-go/tfprotov5/tf5server"
-	tf5muxserver "github.com/hashicorp/terraform-plugin-mux/tf5muxserver"
-
-	"github.com/hashicorp/terraform-provider-kubernetes/kubernetes"
-	manifest "github.com/hashicorp/terraform-provider-kubernetes/manifest/provider"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6/tf6server"
+	"github.com/hashicorp/terraform-provider-kubernetes/internal/mux"
 )
 
-const providerName = "registry.terraform.io/hashicorp/kubernetes"
+const (
+	providerName = "registry.terraform.io/hashicorp/kubernetes"
+
+	Version = "dev"
+)
 
 // Generate docs for website
 //go:generate go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs
@@ -30,17 +32,14 @@ func main() {
 	debugFlag := flag.Bool("debug", false, "Start provider in stand-alone debug mode.")
 	flag.Parse()
 
-	mainProvider := kubernetes.Provider().GRPCProvider
-	manifestProvider := manifest.Provider()
-
 	ctx := context.Background()
-	muxer, err := tf5muxserver.NewMuxServer(ctx, mainProvider, manifestProvider)
+	muxer, err := mux.MuxServer(ctx, Version)
 	if err != nil {
 		log.Println(err.Error())
 		os.Exit(1)
 	}
 
-	opts := []tf5server.ServeOpt{}
+	opts := []tf6server.ServeOpt{}
 	if *debugFlag {
 		reattachConfigCh := make(chan *plugin.ReattachConfig)
 		go func() {
@@ -51,18 +50,19 @@ func main() {
 			}
 			printReattachConfig(reattachConfig)
 		}()
-		opts = append(opts, tf5server.WithDebug(ctx, reattachConfigCh, nil))
+		opts = append(opts, tf6server.WithDebug(ctx, reattachConfigCh, nil))
 	}
 
-	tf5server.Serve(providerName, muxer.ProviderServer, opts...)
+	tf6server.Serve(providerName, func() tfprotov6.ProviderServer { return muxer }, opts...)
 }
 
 // convertReattachConfig converts plugin.ReattachConfig to tfexec.ReattachConfig
 func convertReattachConfig(reattachConfig *plugin.ReattachConfig) tfexec.ReattachConfig {
 	return tfexec.ReattachConfig{
-		Protocol: string(reattachConfig.Protocol),
-		Pid:      reattachConfig.Pid,
-		Test:     true,
+		Protocol:        string(reattachConfig.Protocol),
+		ProtocolVersion: reattachConfig.ProtocolVersion,
+		Pid:             reattachConfig.Pid,
+		Test:            true,
 		Addr: tfexec.ReattachConfigAddr{
 			Network: reattachConfig.Addr.Network(),
 			String:  reattachConfig.Addr.String(),

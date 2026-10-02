@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -10,10 +10,14 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
+	"github.com/hashicorp/terraform-plugin-testing/statecheck"
+	"github.com/hashicorp/terraform-plugin-testing/tfversion"
 )
 
 func TestAccKubernetesClusterRoleBindingV1_basic(t *testing.T) {
@@ -23,8 +27,6 @@ func TestAccKubernetesClusterRoleBindingV1_basic(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesClusterRoleBindingV1Destroy,
 		Steps: []resource.TestStep{
@@ -125,6 +127,39 @@ func TestAccKubernetesClusterRoleBindingV1_basic(t *testing.T) {
 	})
 }
 
+func TestAccKubernetesClusterRoleBindingV1_identity(t *testing.T) {
+	resourceName := "kubernetes_cluster_role_binding_v1.test"
+	name := fmt.Sprintf("tf-acc-test:%s", acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum))
+
+	resource.ParallelTest(t, resource.TestCase{
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckKubernetesClusterRoleBindingV1Destroy,
+		TerraformVersionChecks: []tfversion.TerraformVersionCheck{
+			tfversion.SkipBelow(tfversion.Version1_12_0),
+		},
+		Steps: []resource.TestStep{
+			{
+				Config: testAccKubernetesClusterRoleBindingV1Config_basic(name),
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectIdentity(
+						resourceName, map[string]knownvalue.Check{
+							"name":        knownvalue.StringExact(name),
+							"api_version": knownvalue.StringExact("rbac.authorization.k8s.io/v1"),
+							"kind":        knownvalue.StringExact("ClusterRoleBinding"),
+						},
+					),
+				},
+			},
+			{
+				ResourceName:    resourceName,
+				ImportState:     true,
+				ImportStateKind: resource.ImportBlockWithResourceIdentity,
+			},
+		},
+	})
+}
+
 func TestAccKubernetesClusterRoleBindingV1_generatedName(t *testing.T) {
 	var conf rbacv1.ClusterRoleBinding
 	prefix := "tf-acc-test-gen:"
@@ -132,8 +167,6 @@ func TestAccKubernetesClusterRoleBindingV1_generatedName(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesClusterRoleBindingV1Destroy,
 		Steps: []resource.TestStep{
@@ -166,8 +199,6 @@ func TestAccKubernetesClusterRoleBindingV1_serviceaccount_subject(t *testing.T) 
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesClusterRoleBindingV1Destroy,
 		Steps: []resource.TestStep{
@@ -200,8 +231,6 @@ func TestAccKubernetesClusterRoleBindingV1_group_subject(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesClusterRoleBindingV1Destroy,
 		Steps: []resource.TestStep{
@@ -240,8 +269,6 @@ func TestAccKubernetesClusterRoleBindingV1_UpdatePatchOperationsOrderWithRemoval
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesClusterRoleBindingV1Destroy,
 		Steps: []resource.TestStep{
@@ -323,7 +350,6 @@ func TestAccKubernetesClusterRoleBindingV1_UpdatePatchOperationsOrderWithRemoval
 
 func testAccCheckKubernetesClusterRoleBindingV1Destroy(s *terraform.State) error {
 	conn, err := testAccProvider.Meta().(KubeClientsets).MainClientset()
-
 	if err != nil {
 		return err
 	}

@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -11,11 +11,16 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
+
+	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
+	"github.com/hashicorp/terraform-plugin-testing/statecheck"
+	"github.com/hashicorp/terraform-plugin-testing/tfversion"
 )
 
 func TestAccKubernetesServiceV1_basic(t *testing.T) {
@@ -25,7 +30,6 @@ func TestAccKubernetesServiceV1_basic(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesServiceV1Destroy,
 		Steps: []resource.TestStep{
@@ -128,6 +132,40 @@ func TestAccKubernetesServiceV1_basic(t *testing.T) {
 	})
 }
 
+func TestAccKubernetesServiceV1_identity(t *testing.T) {
+	name := acctest.RandomWithPrefix("tf-acc-test")
+	resourceName := "kubernetes_service_v1.test"
+
+	resource.ParallelTest(t, resource.TestCase{
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactories,
+		TerraformVersionChecks: []tfversion.TerraformVersionCheck{
+			tfversion.SkipBelow(tfversion.Version1_12_0),
+		},
+		CheckDestroy: testAccCheckKubernetesServiceV1Destroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccKubernetesServiceV1Config_identity(name),
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectIdentity(
+						resourceName, map[string]knownvalue.Check{
+							"namespace":   knownvalue.StringExact("default"),
+							"name":        knownvalue.StringExact(name),
+							"api_version": knownvalue.StringExact("v1"),
+							"kind":        knownvalue.StringExact("Service"),
+						},
+					),
+				},
+			},
+			{
+				ResourceName:    resourceName,
+				ImportState:     true,
+				ImportStateKind: resource.ImportBlockWithResourceIdentity,
+			},
+		},
+	})
+}
+
 func TestAccKubernetesServiceV1_loadBalancer(t *testing.T) {
 	var conf corev1.Service
 	name := acctest.RandomWithPrefix("tf-acc-test")
@@ -135,7 +173,6 @@ func TestAccKubernetesServiceV1_loadBalancer(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t); skipIfNoLoadBalancersAvailable(t) },
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesServiceV1Destroy,
 		Steps: []resource.TestStep{
@@ -230,7 +267,6 @@ func TestAccKubernetesServiceV1_loadBalancer_internal_traffic_policy(t *testing.
 			// internalTrafficPolicy is availabe in version 1.22+
 			skipIfClusterVersionLessThan(t, "1.21.0")
 		},
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesServiceV1Destroy,
 		Steps: []resource.TestStep{
@@ -271,7 +307,6 @@ func TestAccKubernetesServiceV1_loadBalancer_class(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesServiceV1Destroy,
 		Steps: []resource.TestStep{
@@ -302,7 +337,6 @@ func TestAccKubernetesServiceV1_loadBalancer_healthcheck(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t); skipIfNoLoadBalancersAvailable(t) },
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesServiceV1Destroy,
 		Steps: []resource.TestStep{
@@ -343,7 +377,6 @@ func TestAccKubernetesServiceV1_headless(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesServiceV1Destroy,
 		Steps: []resource.TestStep{
@@ -372,7 +405,6 @@ func TestAccKubernetesServiceV1_loadBalancer_annotations_aws(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t); skipIfNoLoadBalancersAvailable(t) },
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesServiceV1Destroy,
 		Steps: []resource.TestStep{
@@ -467,7 +499,6 @@ func TestAccKubernetesServiceV1_nodePort(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesServiceV1Destroy,
 		Steps: []resource.TestStep{
@@ -504,14 +535,14 @@ func TestAccKubernetesServiceV1_nodePort(t *testing.T) {
 					resource.TestCheckResourceAttr(resourceName, "spec.0.type", "NodePort"),
 					testAccCheckServiceV1Ports(&conf, []corev1.ServicePort{
 						{
-							AppProtocol: ptrToString("ssh"),
+							AppProtocol: ptr.To("ssh"),
 							Name:        "first",
 							Port:        int32(10222),
 							Protocol:    corev1.ProtocolTCP,
 							TargetPort:  intstr.FromInt(22),
 						},
 						{
-							AppProtocol: ptrToString("terraform.io/kubernetes"),
+							AppProtocol: ptr.To("terraform.io/kubernetes"),
 							Name:        "second",
 							Port:        int32(10333),
 							Protocol:    corev1.ProtocolTCP,
@@ -568,7 +599,6 @@ func TestAccKubernetesServiceV1_noTargetPort(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t); skipIfNoLoadBalancersAvailable(t) },
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesServiceV1Destroy,
 		Steps: []resource.TestStep{
@@ -629,7 +659,6 @@ func TestAccKubernetesServiceV1_stringTargetPort(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t); skipIfNoLoadBalancersAvailable(t) },
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesServiceV1Destroy,
 		Steps: []resource.TestStep{
@@ -664,7 +693,6 @@ func TestAccKubernetesServiceV1_externalName(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesServiceV1Destroy,
 		Steps: []resource.TestStep{
@@ -703,7 +731,6 @@ func TestAccKubernetesServiceV1_externalName_toClusterIp(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesServiceV1Destroy,
 		Steps: []resource.TestStep{
@@ -755,7 +782,6 @@ func TestAccKubernetesServiceV1_generatedName(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesServiceV1Destroy,
 		Steps: []resource.TestStep{
@@ -790,7 +816,6 @@ func TestAccKubernetesServiceV1_ipFamilies(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesServiceV1Destroy,
 		Steps: []resource.TestStep{
@@ -816,6 +841,52 @@ func TestAccKubernetesServiceV1_ipFamilies(t *testing.T) {
 			},
 		},
 	})
+}
+
+func TestAccKubernetesServiceV1_loadBalancer_ipMode(t *testing.T) {
+	var conf corev1.Service
+	name := acctest.RandomWithPrefix("tf-acc-test")
+	resourceName := "kubernetes_service_v1.test"
+
+	resource.ParallelTest(t, resource.TestCase{
+		PreCheck:          func() { testAccPreCheck(t); skipIfNoLoadBalancersAvailable(t) },
+		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
+		ProviderFactories: testAccProviderFactories,
+		CheckDestroy:      testAccCheckKubernetesServiceV1Destroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccKubernetesConfig_ignoreAnnotations() +
+					testAccKubernetesServiceV1Config_loadBalancer_ipMode(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckKubernetesServiceV1Exists(resourceName, &conf),
+					resource.TestCheckResourceAttr(resourceName, "metadata.0.name", name),
+					resource.TestCheckResourceAttr(resourceName, "spec.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "spec.0.type", "LoadBalancer"),
+					resource.TestCheckResourceAttr(resourceName, "status.0.load_balancer.0.ingress.0.ip_mode", "VIP"),
+				),
+			},
+		},
+	})
+}
+
+func testAccKubernetesServiceV1Config_loadBalancer_ipMode(name string) string {
+	return fmt.Sprintf(`
+resource "kubernetes_service_v1" "test" {
+  metadata {
+    name = "%s"
+  }
+  spec {
+    type = "LoadBalancer"
+    selector = {
+      app = "test-app"
+    }
+    port {
+      port        = 80
+      target_port = 80
+    }
+  }
+}
+`, name)
 }
 
 func testAccCheckServiceV1Ports(svc *corev1.Service, expected []corev1.ServicePort) resource.TestCheckFunc {
@@ -867,7 +938,6 @@ func testAccCheckloadBalancerIngressCheck(resourceName string) resource.TestChec
 
 func testAccCheckKubernetesServiceV1Destroy(s *terraform.State) error {
 	conn, err := testAccProvider.Meta().(KubeClientsets).MainClientset()
-
 	if err != nil {
 		return err
 	}
@@ -878,7 +948,7 @@ func testAccCheckKubernetesServiceV1Destroy(s *terraform.State) error {
 			continue
 		}
 
-		namespace, name, err := idParts(rs.Primary.ID)
+		namespace, name, err := IdParts(rs.Primary.ID)
 		if err != nil {
 			return err
 		}
@@ -907,7 +977,7 @@ func testAccCheckKubernetesServiceV1Exists(n string, obj *corev1.Service) resour
 		}
 		ctx := context.TODO()
 
-		namespace, name, err := idParts(rs.Primary.ID)
+		namespace, name, err := IdParts(rs.Primary.ID)
 		if err != nil {
 			return err
 		}
@@ -954,6 +1024,24 @@ func testAccKubernetesServiceV1Config_basic(name string) string {
       target_port = 80
     }
   }
+}
+`, name)
+}
+
+func testAccKubernetesServiceV1Config_identity(name string) string {
+	return fmt.Sprintf(`resource "kubernetes_service_v1" "test" {
+  metadata {
+    name = "%s"
+  }
+
+  spec {
+    port {
+      port        = 8080
+      target_port = 80
+    }
+  }
+
+  wait_for_load_balancer = false
 }
 `, name)
 }

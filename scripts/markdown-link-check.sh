@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copyright (c) HashiCorp, Inc.
+# Copyright IBM Corp. 2017, 2026
 # SPDX-License-Identifier: MPL-2.0
 
 # Local script runner for recursive markdown-link-check.
@@ -41,7 +41,7 @@ ${DOCKER} run ${DOCKER_RUN_OPTS} --rm -i -t \
   -w /github/workspace \
   --entrypoint /usr/bin/find \
   docker.io/robertbeal/markdown-link-checker \
-  website \( -type f -name "*.md" -or -name "*.markdown" \) -exec markdown-link-check --config .markdownlinkcheck.json --quiet --verbose {} \; \
+  docs \( -type f -name "*.md" -or -name "*.markdown" \) -exec markdown-link-check --config .markdownlinkcheck.json --quiet --verbose {} \; \
   | tee -a "${output_file}"
 
 touch "${error_file}"

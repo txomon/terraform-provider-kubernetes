@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -11,11 +11,12 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -27,15 +28,18 @@ const (
 	TimedOutReason = "ProgressDeadlineExceeded"
 )
 
-func resourceKubernetesDeploymentV1() *schema.Resource {
+func resourceKubernetesDeploymentV1(deprecationMessage string) *schema.Resource {
 	return &schema.Resource{
-		CreateContext: resourceKubernetesDeploymentV1Create,
-		ReadContext:   resourceKubernetesDeploymentV1Read,
-		UpdateContext: resourceKubernetesDeploymentV1Update,
-		DeleteContext: resourceKubernetesDeploymentV1Delete,
+		Description:        "A Deployment ensures that a specified number of pod “replicas” are running at any one time. In other words, a Deployment makes sure that a pod or homogeneous set of pods are always up and available. If there are too many pods, it will kill some. If there are too few, the Deployment will start more.",
+		CreateContext:      resourceKubernetesDeploymentV1Create,
+		ReadContext:        resourceKubernetesDeploymentV1Read,
+		DeprecationMessage: deprecationMessage,
+		UpdateContext:      resourceKubernetesDeploymentV1Update,
+		DeleteContext:      resourceKubernetesDeploymentV1Delete,
 		Importer: &schema.ResourceImporter{
-			StateContext: schema.ImportStatePassthroughContext,
+			StateContext: resourceIdentityImportNamespaced,
 		},
+		Identity: resourceIdentitySchemaNamespaced(),
 		Timeouts: &schema.ResourceTimeout{
 			Create: schema.DefaultTimeout(10 * time.Minute),
 			Update: schema.DefaultTimeout(10 * time.Minute),
@@ -198,7 +202,7 @@ func resourceKubernetesDeploymentSchemaV1() map[string]*schema.Schema {
 									Required:    true,
 									MaxItems:    1,
 									Elem: &schema.Resource{
-										Schema: podSpecFields(true, false),
+										Schema: deploymentPodTemplateSpecFields(),
 									},
 								},
 							},
@@ -214,6 +218,16 @@ func resourceKubernetesDeploymentSchemaV1() map[string]*schema.Schema {
 			Optional:    true,
 		},
 	}
+}
+
+func deploymentPodTemplateSpecFields() map[string]*schema.Schema {
+	psf := podSpecFields(true, false)
+	rp := psf["restart_policy"]
+	rp.ValidateFunc = validation.StringInSlice([]string{
+		string(corev1.RestartPolicyAlways),
+	}, false)
+	rp.Description = "Restart policy for all containers within the pod. Defaults to Always as the only option. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy."
+	return psf
 }
 
 func resourceKubernetesDeploymentV1Create(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
@@ -239,13 +253,13 @@ func resourceKubernetesDeploymentV1Create(ctx context.Context, d *schema.Resourc
 		return diag.Errorf("Failed to create deployment: %s", err)
 	}
 
-	d.SetId(buildId(out.ObjectMeta))
+	d.SetId(BuildId(out.ObjectMeta))
 
 	log.Printf("[DEBUG] Waiting for deployment %s to schedule %d replicas", d.Id(), *out.Spec.Replicas)
 
 	if d.Get("wait_for_rollout").(bool) {
 		log.Printf("[INFO] Waiting for deployment %s/%s to rollout", out.ObjectMeta.Namespace, out.ObjectMeta.Name)
-		err := resource.RetryContext(ctx, d.Timeout(schema.TimeoutCreate),
+		err := retry.RetryContext(ctx, d.Timeout(schema.TimeoutCreate),
 			waitForDeploymentReplicasFunc(ctx, conn, out.GetNamespace(), out.GetName()))
 		if err != nil {
 			return diag.FromErr(err)
@@ -263,7 +277,7 @@ func resourceKubernetesDeploymentV1Update(ctx context.Context, d *schema.Resourc
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -305,7 +319,7 @@ func resourceKubernetesDeploymentV1Update(ctx context.Context, d *schema.Resourc
 
 	if d.Get("wait_for_rollout").(bool) {
 		log.Printf("[INFO] Waiting for deployment %s/%s to rollout", out.ObjectMeta.Namespace, out.ObjectMeta.Name)
-		err := resource.RetryContext(ctx, d.Timeout(schema.TimeoutUpdate),
+		err := retry.RetryContext(ctx, d.Timeout(schema.TimeoutUpdate),
 			waitForDeploymentReplicasFunc(ctx, conn, out.GetNamespace(), out.GetName()))
 		if err != nil {
 			return diag.FromErr(err)
@@ -329,7 +343,7 @@ func resourceKubernetesDeploymentV1Read(ctx context.Context, d *schema.ResourceD
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -357,6 +371,11 @@ func resourceKubernetesDeploymentV1Read(ctx context.Context, d *schema.ResourceD
 		return diag.FromErr(err)
 	}
 
+	err = setResourceIdentityNamespaced(d, "apps/v1", "Deployment", namespace, name)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
 	return nil
 }
 
@@ -366,7 +385,7 @@ func resourceKubernetesDeploymentV1Delete(ctx context.Context, d *schema.Resourc
 		return diag.FromErr(err)
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -381,17 +400,17 @@ func resourceKubernetesDeploymentV1Delete(ctx context.Context, d *schema.Resourc
 		return diag.FromErr(err)
 	}
 
-	err = resource.RetryContext(ctx, d.Timeout(schema.TimeoutDelete), func() *resource.RetryError {
+	err = retry.RetryContext(ctx, d.Timeout(schema.TimeoutDelete), func() *retry.RetryError {
 		_, err := conn.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			if statusErr, ok := err.(*errors.StatusError); ok && errors.IsNotFound(statusErr) {
 				return nil
 			}
-			return resource.NonRetryableError(err)
+			return retry.NonRetryableError(err)
 		}
 
 		e := fmt.Errorf("Deployment (%s) still exists", d.Id())
-		return resource.RetryableError(e)
+		return retry.RetryableError(e)
 	})
 	if err != nil {
 		return diag.FromErr(err)
@@ -409,7 +428,7 @@ func resourceKubernetesDeploymentV1Exists(ctx context.Context, d *schema.Resourc
 		return false, err
 	}
 
-	namespace, name, err := idParts(d.Id())
+	namespace, name, err := IdParts(d.Id())
 	if err != nil {
 		return false, err
 	}
@@ -437,12 +456,12 @@ func GetDeploymentCondition(status appsv1.DeploymentStatus, condType appsv1.Depl
 	return nil
 }
 
-func waitForDeploymentReplicasFunc(ctx context.Context, conn *kubernetes.Clientset, ns, name string) resource.RetryFunc {
-	return func() *resource.RetryError {
+func waitForDeploymentReplicasFunc(ctx context.Context, conn *kubernetes.Clientset, ns, name string) retry.RetryFunc {
+	return func() *retry.RetryError {
 		// Query the deployment to get a status update.
 		dply, err := conn.AppsV1().Deployments(ns).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
-			return resource.NonRetryableError(err)
+			return retry.NonRetryableError(err)
 		}
 
 		var specReplicas int32 = 1 // default, according to API docs
@@ -451,33 +470,33 @@ func waitForDeploymentReplicasFunc(ctx context.Context, conn *kubernetes.Clients
 		}
 
 		if dply.Generation > dply.Status.ObservedGeneration {
-			return resource.RetryableError(fmt.Errorf("Waiting for rollout to start"))
+			return retry.RetryableError(fmt.Errorf("Waiting for rollout to start"))
 		}
 
 		if dply.Generation == dply.Status.ObservedGeneration {
 			cond := GetDeploymentCondition(dply.Status, appsv1.DeploymentProgressing)
 			if cond != nil && cond.Reason == TimedOutReason {
-				return resource.NonRetryableError(fmt.Errorf("Deployment exceeded its progress deadline"))
+				return retry.NonRetryableError(fmt.Errorf("Deployment exceeded its progress deadline"))
 			}
 
 			if dply.Status.UpdatedReplicas < specReplicas {
-				return resource.RetryableError(fmt.Errorf("Waiting for rollout to finish: %d out of %d new replicas have been updated...", dply.Status.UpdatedReplicas, specReplicas))
+				return retry.RetryableError(fmt.Errorf("Waiting for rollout to finish: %d out of %d new replicas have been updated...", dply.Status.UpdatedReplicas, specReplicas))
 			}
 
 			if dply.Status.Replicas > dply.Status.UpdatedReplicas {
-				return resource.RetryableError(fmt.Errorf("Waiting for rollout to finish: %d old replicas are pending termination...", dply.Status.Replicas-dply.Status.UpdatedReplicas))
+				return retry.RetryableError(fmt.Errorf("Waiting for rollout to finish: %d old replicas are pending termination...", dply.Status.Replicas-dply.Status.UpdatedReplicas))
 			}
 
 			if dply.Status.Replicas > dply.Status.ReadyReplicas {
-				return resource.RetryableError(fmt.Errorf("Waiting for rollout to finish: %d replicas wanted; %d replicas Ready", dply.Status.Replicas, dply.Status.ReadyReplicas))
+				return retry.RetryableError(fmt.Errorf("Waiting for rollout to finish: %d replicas wanted; %d replicas Ready", dply.Status.Replicas, dply.Status.ReadyReplicas))
 			}
 
 			if dply.Status.AvailableReplicas < dply.Status.UpdatedReplicas {
-				return resource.RetryableError(fmt.Errorf("Waiting for rollout to finish: %d of %d updated replicas are available...", dply.Status.AvailableReplicas, dply.Status.UpdatedReplicas))
+				return retry.RetryableError(fmt.Errorf("Waiting for rollout to finish: %d of %d updated replicas are available...", dply.Status.AvailableReplicas, dply.Status.UpdatedReplicas))
 			}
 			return nil
 		}
 
-		return resource.NonRetryableError(fmt.Errorf("Observed generation %d is not expected to be greater than generation %d", dply.Status.ObservedGeneration, dply.Generation))
+		return retry.NonRetryableError(fmt.Errorf("Observed generation %d is not expected to be greater than generation %d", dply.Status.ObservedGeneration, dply.Generation))
 	}
 }

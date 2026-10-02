@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -21,6 +21,7 @@ import (
 
 func resourceKubernetesRuntimeClassV1() *schema.Resource {
 	return &schema.Resource{
+		Description:   "A runtime class is used to determine which container runtime is used to run all containers in a pod.",
 		CreateContext: resourceKubernetesRuntimeClassV1Create,
 		ReadContext:   resourceKubernetesRuntimeClassV1Read,
 		UpdateContext: resourceKubernetesRuntimeClassV1Update,

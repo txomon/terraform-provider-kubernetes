@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2017, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package kubernetes
@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -20,8 +20,6 @@ func TestAccKubernetesDefaultServiceAccountV1_basic(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesServiceAccountV1Destroy,
 		Steps: []resource.TestStep{
@@ -62,8 +60,6 @@ func TestAccKubernetesDefaultServiceAccountV1_secrets(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesServiceAccountV1Destroy,
 		Steps: []resource.TestStep{
@@ -97,8 +93,6 @@ func TestAccKubernetesDefaultServiceAccountV1_automountServiceAccountToken(t *te
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		IDRefreshName:     resourceName,
-		IDRefreshIgnore:   []string{"metadata.0.resource_version"},
 		ProviderFactories: testAccProviderFactories,
 		CheckDestroy:      testAccCheckKubernetesServiceAccountV1Destroy,
 		Steps: []resource.TestStep{
@@ -124,7 +118,7 @@ func TestAccKubernetesDefaultServiceAccountV1_automountServiceAccountToken(t *te
 }
 
 func testAccKubernetesDefaultServiceAccountV1Config_basic(namespace string) string {
-	return fmt.Sprintf(`resource "kubernetes_namespace_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_namespace" "test" {
   metadata {
     name = "%s"
   }
@@ -132,7 +126,7 @@ func testAccKubernetesDefaultServiceAccountV1Config_basic(namespace string) stri
 
 resource "kubernetes_default_service_account_v1" "test" {
   metadata {
-    namespace = kubernetes_namespace_v1.test.metadata.0.name
+    namespace = kubernetes_namespace.test.metadata.0.name
 
     annotations = {
       TestAnnotationOne = "one"
@@ -150,7 +144,7 @@ resource "kubernetes_default_service_account_v1" "test" {
 }
 
 func testAccKubernetesDefaultServiceAccountV1Config_secrets(namespace string, name string) string {
-	return fmt.Sprintf(`resource "kubernetes_namespace_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_namespace" "test" {
   metadata {
     name = "%s"
   }
@@ -158,7 +152,7 @@ func testAccKubernetesDefaultServiceAccountV1Config_secrets(namespace string, na
 
 resource "kubernetes_default_service_account_v1" "test" {
   metadata {
-    namespace = kubernetes_namespace_v1.test.metadata.0.name
+    namespace = kubernetes_namespace.test.metadata.0.name
   }
 
   secret {
@@ -173,21 +167,21 @@ resource "kubernetes_default_service_account_v1" "test" {
 resource "kubernetes_secret_v1" "one" {
   metadata {
     name      = "%s-one"
-    namespace = kubernetes_namespace_v1.test.metadata.0.name
+    namespace = kubernetes_namespace.test.metadata.0.name
   }
 }
 
 resource "kubernetes_secret_v1" "two" {
   metadata {
     name      = "%s-two"
-    namespace = kubernetes_namespace_v1.test.metadata.0.name
+    namespace = kubernetes_namespace.test.metadata.0.name
   }
 }
 `, namespace, name, name)
 }
 
 func testAccKubernetesDefaultServiceAccountV1Config_automountServiceAccountToken(namespace string) string {
-	return fmt.Sprintf(`resource "kubernetes_namespace_v1" "test" {
+	return fmt.Sprintf(`resource "kubernetes_namespace" "test" {
   metadata {
     name = "%s"
   }
@@ -195,7 +189,7 @@ func testAccKubernetesDefaultServiceAccountV1Config_automountServiceAccountToken
 
 resource "kubernetes_default_service_account_v1" "test" {
   metadata {
-    namespace = kubernetes_namespace_v1.test.metadata.0.name
+    namespace = kubernetes_namespace.test.metadata.0.name
   }
 
   automount_service_account_token = false
